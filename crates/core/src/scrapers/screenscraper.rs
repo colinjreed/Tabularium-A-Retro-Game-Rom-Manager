@@ -119,7 +119,7 @@ impl ScreenScraper {
         let mut q = vec![
             ("devid", self.creds.dev_id.clone()),
             ("devpassword", self.creds.dev_password.clone()),
-            ("softname", "rom-manager".into()),
+            ("softname", "tabularium".into()),
             ("output", "json".into()),
             ("ssid", self.creds.user.clone()),
             ("sspassword", self.creds.password.clone()),

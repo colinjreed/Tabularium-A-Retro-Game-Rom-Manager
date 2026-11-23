@@ -3398,45 +3398,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rom-manager"
-version = "0.2.0"
-dependencies = [
- "eframe",
- "egui",
- "egui_extras",
- "image",
- "open",
- "rfd",
- "rom-manager-core",
- "serde",
- "serde_json",
- "winresource",
-]
-
-[[package]]
-name = "rom-manager-core"
-version = "0.2.0"
-dependencies = [
- "crc32fast",
- "dunce",
- "fs4",
- "image",
- "md-5",
- "percent-encoding",
- "regex",
- "rusqlite",
- "serde",
- "serde_json",
- "strsim",
- "tempfile",
- "thiserror 2.0.21",
- "ureq",
- "walkdir",
- "xmltree",
- "zip",
-]
-
-[[package]]
 name = "ron"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3961,6 +3922,45 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.10",
+]
+
+[[package]]
+name = "tabularium"
+version = "0.2.0"
+dependencies = [
+ "eframe",
+ "egui",
+ "egui_extras",
+ "image",
+ "open",
+ "rfd",
+ "serde",
+ "serde_json",
+ "tabularium-core",
+ "winresource",
+]
+
+[[package]]
+name = "tabularium-core"
+version = "0.2.0"
+dependencies = [
+ "crc32fast",
+ "dunce",
+ "fs4",
+ "image",
+ "md-5",
+ "percent-encoding",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "strsim",
+ "tempfile",
+ "thiserror 2.0.21",
+ "ureq",
+ "walkdir",
+ "xmltree",
+ "zip",
 ]
 
 [[package]]

@@ -28,7 +28,7 @@ fn agent() -> &'static ureq::Agent {
     static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
     AGENT.get_or_init(|| {
         ureq::Agent::config_builder()
-            .user_agent(concat!("rom-manager/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("tabularium/", env!("CARGO_PKG_VERSION")))
             .timeout_global(Some(Duration::from_secs(45)))
             .http_status_as_error(false)
             // Use the operating system's certificate store.

@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=ROM Manager
+Name=Tabularium
 Comment=Organise retro ROMs and build SD cards for handhelds
-Exec=rom-manager %f
-Icon=rom-manager
+Exec=tabularium %f
+Icon=tabularium
 Terminal=false
 Categories=Game;Utility;

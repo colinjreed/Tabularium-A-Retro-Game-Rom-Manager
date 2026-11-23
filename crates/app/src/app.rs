@@ -5,10 +5,10 @@ use crate::pages;
 use crate::settings::Settings;
 use crate::widgets::{self, page_title};
 use egui::{Color32, RichText, Ui};
-use rom_manager_core::library::{Library, Rom, SystemStats};
-use rom_manager_core::{human_size, systems};
 use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
+use tabularium_core::library::{Library, Rom, SystemStats};
+use tabularium_core::{human_size, systems};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Page {
@@ -141,7 +141,7 @@ impl RomApp {
     /// Re-read the library index after something changed.
     pub fn reload(&mut self) {
         let Some(lib) = &self.lib else { return };
-        let res = (|| -> rom_manager_core::Result<LibData> {
+        let res = (|| -> tabularium_core::Result<LibData> {
             Ok(LibData {
                 roms: lib.active()?,
                 trashed: lib.roms(&[], "trashed")?,
@@ -238,7 +238,7 @@ impl RomApp {
         ui.horizontal(|ui| {
             ui.add_space(6.0);
             ui.label(RichText::new("🎮").size(22.0));
-            ui.label(RichText::new("ROM Manager").size(19.0).strong());
+            ui.label(RichText::new("Tabularium").size(19.0).strong());
         });
         ui.add_space(14.0);
         for p in Page::ALL {
@@ -323,7 +323,7 @@ impl RomApp {
         ui.vertical_centered(|ui| {
             ui.add_space(50.0);
             ui.label(RichText::new("🎮").size(56.0));
-            ui.heading(RichText::new("Welcome to ROM Manager").size(26.0).strong());
+            ui.heading(RichText::new("Welcome to Tabularium").size(26.0).strong());
             ui.add_space(6.0);
             ui.label(
                 "Organise your ROMs into one library, clean out duplicates, fetch artwork, \
@@ -376,7 +376,7 @@ impl RomApp {
                             self.open_library(p);
                         } else {
                             self.notify_err(format!(
-                                "{} isn't a ROM Manager library (no library.db).",
+                                "{} isn't a Tabularium library (no library.db).",
                                 p.display()
                             ));
                         }
@@ -387,7 +387,7 @@ impl RomApp {
                         self.open_library(p);
                     } else {
                         self.notify_err(format!(
-                            "{} isn't a ROM Manager library (no library.db).",
+                            "{} isn't a Tabularium library (no library.db).",
                             p.display()
                         ));
                     }
@@ -730,7 +730,7 @@ impl RomApp {
         if !dir.is_dir() {
             return;
         }
-        let current = rom_manager_core::folder_games::scummvm_id(&dir);
+        let current = tabularium_core::folder_games::scummvm_id(&dir);
         let key = egui::Id::unique(("scummvm-id", rom.id));
         let mut text: String = ui
             .data_mut(|d| d.get_temp(key))
@@ -764,7 +764,7 @@ impl RomApp {
         );
         if save && !text.trim().is_empty() {
             let id = text.trim().to_string();
-            match rom_manager_core::folder_games::write_scummvm_id(&dir, &rom.stem, &id) {
+            match tabularium_core::folder_games::write_scummvm_id(&dir, &rom.stem, &id) {
                 Ok(()) => {
                     self.notice =
                         Some((format!("Saved ScummVM ID '{id}' for {}.", rom.stem), false))

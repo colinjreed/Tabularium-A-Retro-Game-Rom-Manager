@@ -2,9 +2,9 @@ use crate::app::RomApp;
 use crate::jobs::{Job, JobOutput};
 use crate::widgets::{self, card, page_title, section};
 use egui::{RichText, Ui};
-use rom_manager_core::bios::{self, FileState, ImportOutcome, ReqStatus};
-use rom_manager_core::{profiles, systems};
 use std::path::PathBuf;
+use tabularium_core::bios::{self, FileState, ImportOutcome, ReqStatus};
+use tabularium_core::{profiles, systems};
 
 pub struct BiosPage {
     pub lib_status: Option<Vec<ReqStatus>>,

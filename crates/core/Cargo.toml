@@ -1,5 +1,5 @@
 [package]
-name = "rom-manager-core"
+name = "tabularium-core"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

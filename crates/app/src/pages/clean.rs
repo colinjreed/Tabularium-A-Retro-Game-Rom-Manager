@@ -2,14 +2,14 @@ use crate::app::RomApp;
 use crate::jobs::{Job, JobOutput};
 use crate::widgets::{card, filter_editor, page_title, section, systems_picker};
 use egui::{RichText, Ui};
-use rom_manager_core::filters::{self, FilterSpec, Rejected};
-use rom_manager_core::library::Library;
-use rom_manager_core::{human_size, systems};
 use std::collections::BTreeMap;
+use tabularium_core::filters::{self, FilterSpec, Rejected};
+use tabularium_core::library::Library;
+use tabularium_core::{human_size, systems};
 
 #[derive(Default)]
 pub struct CleanPage {
-    pub rename: Option<rom_manager_core::rename::FixReport>,
+    pub rename: Option<tabularium_core::rename::FixReport>,
     pub spec: FilterSpec,
     pub systems: Vec<String>,
     pub results: Option<Vec<Rejected>>,
@@ -221,11 +221,11 @@ impl RomApp {
                 Ok(l) => l,
                 Err(e) => return JobOutput::Error(e.to_string()),
             };
-            let mut dats = rom_manager_core::dats::Dats::new(
-                rom_manager_core::metadata::cache_dir(&lib),
-                rom_manager_core::http::default_fetcher(),
+            let mut dats = tabularium_core::dats::Dats::new(
+                tabularium_core::metadata::cache_dir(&lib),
+                tabularium_core::http::default_fetcher(),
             );
-            match rom_manager_core::rename::fix_library(&lib, Some(&mut dats), true, apply, rep) {
+            match tabularium_core::rename::fix_library(&lib, Some(&mut dats), true, apply, rep) {
                 Ok(report) => JobOutput::Rename {
                     report,
                     applied: apply,

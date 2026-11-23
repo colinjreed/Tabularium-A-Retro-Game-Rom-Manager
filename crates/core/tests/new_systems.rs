@@ -1,16 +1,16 @@
 //! PS2, GameCube, 3DS, Xbox, DOS, ScummVM and arcade (MAME / CPS / FBNeo).
 
-use rom_manager_core::collection::{self, Collection, ExportOptions};
-use rom_manager_core::folder_games::scummvm_id;
-use rom_manager_core::http::{Fetcher, HttpError};
-use rom_manager_core::import::{import, ImportOptions};
-use rom_manager_core::library::Library;
-use rom_manager_core::progress::Silent;
-use rom_manager_core::{bios, profiles, systems};
 use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
+use tabularium_core::collection::{self, Collection, ExportOptions};
+use tabularium_core::folder_games::scummvm_id;
+use tabularium_core::http::{Fetcher, HttpError};
+use tabularium_core::import::{import, ImportOptions};
+use tabularium_core::library::Library;
+use tabularium_core::progress::Silent;
+use tabularium_core::{bios, profiles, systems};
 
 fn write(p: &Path, data: &[u8]) {
     fs::create_dir_all(p.parent().unwrap()).unwrap();
@@ -322,13 +322,13 @@ fn new_bios_and_folders() {
 #[ignore]
 fn live_name_lists() {
     let tmp = tempfile::tempdir().unwrap();
-    let fetch = rom_manager_core::http::default_fetcher();
-    let names = rom_manager_core::metadata::arcade_names(tmp.path(), &fetch).expect("arcade list");
+    let fetch = tabularium_core::http::default_fetcher();
+    let names = tabularium_core::metadata::arcade_names(tmp.path(), &fetch).expect("arcade list");
     println!("arcade names: {}", names.len());
     for s in ["sf2", "sfiii3", "ssf2t", "mslug", "pacman", "dkong"] {
         println!("  {s} -> {:?}", names.get(s));
     }
-    let ids = rom_manager_core::metadata::scummvm_ids(tmp.path(), &fetch).expect("scummvm list");
+    let ids = tabularium_core::metadata::scummvm_ids(tmp.path(), &fetch).expect("scummvm list");
     println!("scummvm titles: {}", ids.len());
     for t in [
         "Monkey Island 2 - LeChuck's Revenge",
@@ -339,7 +339,7 @@ fn live_name_lists() {
     ] {
         println!(
             "  {t} -> {:?}",
-            rom_manager_core::metadata::guess_scummvm_id(&ids, t)
+            tabularium_core::metadata::guess_scummvm_id(&ids, t)
         );
     }
 }
@@ -348,13 +348,13 @@ fn live_name_lists() {
 #[test]
 #[ignore]
 fn live_arcade_art() {
-    use rom_manager_core::scrapers::{libretro::LibretroScraper, Scraper};
+    use tabularium_core::scrapers::{libretro::LibretroScraper, Scraper};
     let tmp = tempfile::tempdir().unwrap();
     let mut sc = LibretroScraper::new(
         tmp.path().to_path_buf(),
-        rom_manager_core::http::default_fetcher(),
+        tabularium_core::http::default_fetcher(),
     );
-    let rom = rom_manager_core::library::Rom {
+    let rom = tabularium_core::library::Rom {
         id: 1,
         system: "arcade".into(),
         path: "roms/arcade/sf2.zip".into(),
@@ -395,7 +395,7 @@ fn demo_library() {
     build(&src);
     let lib = Library::create(&dir.join("lib")).unwrap();
     let opts = ImportOptions {
-        fetch: Some(rom_manager_core::http::default_fetcher()),
+        fetch: Some(tabularium_core::http::default_fetcher()),
         ..Default::default()
     };
     import(&lib, &[src], &opts, &Silent).unwrap();

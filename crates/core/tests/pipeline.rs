@@ -1,21 +1,21 @@
 //! End-to-end tests on a generated "messy" collection. No network access.
 
 use md5::{Digest, Md5};
-use rom_manager_core::collection::{self, Collection, ExportOptions};
-use rom_manager_core::filters::FilterSpec;
-use rom_manager_core::http::{Fetcher, HttpError};
-use rom_manager_core::import::{import, ImportOptions};
-use rom_manager_core::library::Library;
-use rom_manager_core::naming::DEFAULT_JUNK;
-use rom_manager_core::progress::Silent;
-use rom_manager_core::scrape::scrape_library;
-use rom_manager_core::scrapers::screenscraper::{pick_media, Credentials, ScreenScraper};
-use rom_manager_core::scrapers::{ScrapeError, Scraper};
-use rom_manager_core::{bios, profiles, systems, Result};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use tabularium_core::collection::{self, Collection, ExportOptions};
+use tabularium_core::filters::FilterSpec;
+use tabularium_core::http::{Fetcher, HttpError};
+use tabularium_core::import::{import, ImportOptions};
+use tabularium_core::library::Library;
+use tabularium_core::naming::DEFAULT_JUNK;
+use tabularium_core::progress::Silent;
+use tabularium_core::scrape::scrape_library;
+use tabularium_core::scrapers::screenscraper::{pick_media, Credentials, ScreenScraper};
+use tabularium_core::scrapers::{ScrapeError, Scraper};
+use tabularium_core::{bios, profiles, systems, Result};
 
 fn rand(n: usize, seed: &str) -> Vec<u8> {
     let mut out = vec![];
@@ -183,7 +183,7 @@ fn detection_and_import() -> Result<()> {
 fn clean_1g1r_trash_restore() -> Result<()> {
     let (_t, lib, src) = setup();
     import(&lib, &[src], &ImportOptions::default(), &Silent)?;
-    let (kept, rejected) = rom_manager_core::filters::apply(lib.active()?, &junk_1g1r());
+    let (kept, rejected) = tabularium_core::filters::apply(lib.active()?, &junk_1g1r());
     let stems: Vec<&str> = kept.iter().map(|r| r.stem.as_str()).collect();
     assert!(stems.contains(&"Tetris (World) (Rev 1)"));
     assert!(!stems.contains(&"Tetris (Japan)"));
@@ -212,7 +212,7 @@ fn clean_1g1r_trash_restore() -> Result<()> {
         region_priority: vec!["Japan".into(), "USA".into()],
         ..Default::default()
     };
-    let (kept, _) = rom_manager_core::filters::apply(lib.roms(&["gb".into()], "active")?, &f);
+    let (kept, _) = tabularium_core::filters::apply(lib.roms(&["gb".into()], "active")?, &f);
     assert!(kept.iter().any(|r| r.stem == "Tetris (Japan)"));
     Ok(())
 }
@@ -235,7 +235,7 @@ impl Scraper for FakeScraper {
     }
     fn fetch(
         &mut self,
-        rom: &rom_manager_core::library::Rom,
+        rom: &tabularium_core::library::Rom,
         _: &systems::System,
         _: &str,
     ) -> std::result::Result<Option<Vec<u8>>, ScrapeError> {
@@ -443,7 +443,7 @@ fn screenscraper_queries_once_per_rom() {
     let mut ss = ScreenScraper::new(creds, fetch)
         .unwrap()
         .with_interval(std::time::Duration::ZERO);
-    let rom = rom_manager_core::library::Rom {
+    let rom = tabularium_core::library::Rom {
         id: 1,
         system: "gb".into(),
         path: "roms/gb/Tetris (World).gb".into(),

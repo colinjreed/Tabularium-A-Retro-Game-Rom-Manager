@@ -2,13 +2,13 @@ use crate::app::RomApp;
 use crate::jobs::{Job, JobOutput};
 use crate::widgets::{self, card, filter_editor, page_title, section, systems_picker};
 use egui::{RichText, Ui};
-use rom_manager_core::collection::{self, Collection, ExportOptions, ExportReport, Selection};
-use rom_manager_core::library::Library;
-use rom_manager_core::naming::DEFAULT_JUNK;
-use rom_manager_core::scrapers::{art_kind_label, ART_KINDS};
-use rom_manager_core::{human_size, profiles, systems};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use tabularium_core::collection::{self, Collection, ExportOptions, ExportReport, Selection};
+use tabularium_core::library::Library;
+use tabularium_core::naming::DEFAULT_JUNK;
+use tabularium_core::scrapers::{art_kind_label, ART_KINDS};
+use tabularium_core::{human_size, profiles, systems};
 
 /// Typical card sizes (marketing GB) and the space we plan to use on them.
 const CARD_SIZES: &[u64] = &[8, 16, 32, 64, 128, 256, 512, 1000];
@@ -264,7 +264,7 @@ impl RomApp {
                             .desired_width(70.0),
                     );
                     if resp.lost_focus() {
-                        if let Some(b) = rom_manager_core::parse_size(&self.cards.custom_size) {
+                        if let Some(b) = tabularium_core::parse_size(&self.cards.custom_size) {
                             col.max_size = Some(b);
                             changed = true;
                         }

@@ -1,7 +1,7 @@
 use crate::app::RomApp;
 use crate::widgets::{card, page_title, section};
 use egui::{RichText, Ui};
-use rom_manager_core::library::Library;
+use tabularium_core::library::Library;
 
 impl RomApp {
     pub fn settings_page(&mut self, ui: &mut Ui) {
@@ -22,10 +22,7 @@ impl RomApp {
                         if Library::is_library(&p) {
                             self.open_library(p);
                         } else {
-                            self.notify_err(format!(
-                                "{} isn't a ROM Manager library.",
-                                p.display()
-                            ));
+                            self.notify_err(format!("{} isn't a Tabularium library.", p.display()));
                         }
                     }
                 }
@@ -87,6 +84,6 @@ impl RomApp {
             ).weak());
         });
         ui.add_space(10.0);
-        ui.label(RichText::new(format!("ROM Manager {}", env!("CARGO_PKG_VERSION"))).weak());
+        ui.label(RichText::new(format!("Tabularium {}", env!("CARGO_PKG_VERSION"))).weak());
     }
 }

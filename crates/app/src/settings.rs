@@ -1,8 +1,8 @@
 //! Settings persisted between runs (via eframe's storage).
 
-use rom_manager_core::scrapers::screenscraper::Credentials;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use tabularium_core::scrapers::screenscraper::Credentials;
 
 pub const KEY: &str = "rom-manager-settings";
 

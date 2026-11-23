@@ -1,14 +1,14 @@
 //! Official names by checksum, numbering removal and Game Gear `.sms` files.
 
-use rom_manager_core::dats::{parse_dat, Dats};
-use rom_manager_core::http::{Fetcher, HttpError};
-use rom_manager_core::import::{import, ImportOptions};
-use rom_manager_core::library::Library;
-use rom_manager_core::progress::Silent;
-use rom_manager_core::rename::fix_library;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use tabularium_core::dats::{parse_dat, Dats};
+use tabularium_core::http::{Fetcher, HttpError};
+use tabularium_core::import::{import, ImportOptions};
+use tabularium_core::library::Library;
+use tabularium_core::progress::Silent;
+use tabularium_core::rename::fix_library;
 
 fn write(p: &Path, data: &[u8]) {
     fs::create_dir_all(p.parent().unwrap()).unwrap();
@@ -180,9 +180,9 @@ fn fix_existing_library() {
 #[test]
 #[ignore]
 fn live_no_intro() {
-    let fetch = rom_manager_core::http::default_fetcher();
+    let fetch = tabularium_core::http::default_fetcher();
     for sys in ["genesis", "gamegear", "nes", "snes", "gba"] {
-        let url = rom_manager_core::dats::dat_url(sys).unwrap();
+        let url = tabularium_core::dats::dat_url(sys).unwrap();
         let body = fetch(&url).unwrap().unwrap();
         let map = parse_dat(&String::from_utf8_lossy(&body));
         let sample = map

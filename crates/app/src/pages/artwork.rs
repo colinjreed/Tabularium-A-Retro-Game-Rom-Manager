@@ -2,12 +2,12 @@ use crate::app::{Page, RomApp};
 use crate::jobs::{Job, JobOutput};
 use crate::widgets::{self, card, page_title, section, systems_picker};
 use egui::{RichText, Ui};
-use rom_manager_core::http::default_fetcher;
-use rom_manager_core::library::Library;
-use rom_manager_core::scrape::{scrape_library, ScrapeReport};
-use rom_manager_core::scrapers::libretro::LibretroScraper;
-use rom_manager_core::scrapers::screenscraper::ScreenScraper;
-use rom_manager_core::scrapers::{art_kind_label, Scraper, ART_KINDS};
+use tabularium_core::http::default_fetcher;
+use tabularium_core::library::Library;
+use tabularium_core::scrape::{scrape_library, ScrapeReport};
+use tabularium_core::scrapers::libretro::LibretroScraper;
+use tabularium_core::scrapers::screenscraper::ScreenScraper;
+use tabularium_core::scrapers::{art_kind_label, Scraper, ART_KINDS};
 
 pub struct ArtworkPage {
     pub libretro: bool,
@@ -193,7 +193,7 @@ impl RomApp {
                 }
             }
             // Arcade art is matched by full name, so make sure names are known.
-            if let Err(e) = rom_manager_core::metadata::enrich(&lib, &default_fetcher(), rep) {
+            if let Err(e) = tabularium_core::metadata::enrich(&lib, &default_fetcher(), rep) {
                 rep.log(e.to_string());
             }
             match scrape_library(&lib, &mut scrapers, &kinds, &systems, refresh, rep) {

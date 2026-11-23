@@ -1,4 +1,4 @@
-//! Core logic for ROM Manager: organise a ROM library, weed out duplicates
+//! Core logic for Tabularium: organise a ROM library, weed out duplicates
 //! and junk, scrape artwork, check BIOS files and export SD card collections.
 
 pub mod bios;

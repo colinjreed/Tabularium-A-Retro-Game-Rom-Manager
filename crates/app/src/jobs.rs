@@ -1,14 +1,14 @@
 //! Long-running work (import, scraping, export…) runs on a background thread
 //! and reports progress to the UI through shared state.
 
-use rom_manager_core::bios::ImportOutcome;
-use rom_manager_core::collection::ExportReport;
-use rom_manager_core::import::ImportReport;
-use rom_manager_core::progress::Reporter;
-use rom_manager_core::scrape::ScrapeReport;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use tabularium_core::bios::ImportOutcome;
+use tabularium_core::collection::ExportReport;
+use tabularium_core::import::ImportReport;
+use tabularium_core::progress::Reporter;
+use tabularium_core::scrape::ScrapeReport;
 
 pub enum JobOutput {
     Import {
@@ -24,7 +24,7 @@ pub enum JobOutput {
     },
     BiosImport(Vec<(PathBuf, ImportOutcome)>),
     Rename {
-        report: rom_manager_core::rename::FixReport,
+        report: tabularium_core::rename::FixReport,
         applied: bool,
     },
     Error(String),

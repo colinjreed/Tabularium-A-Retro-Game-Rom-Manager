@@ -33,26 +33,26 @@ jobs:
         run: cargo build --release --locked
       - name: Package (tar.gz + AppImage)
         run: |
-          mkdir -p dist/rom-manager
-          cp target/release/rom-manager dist/rom-manager/
-          cp packaging/linux/rom-manager.desktop packaging/linux/install.sh dist/rom-manager/
-          cp assets/icon-256.png dist/rom-manager/rom-manager.png
-          tar -C dist -czf rom-manager-linux-x86_64.tar.gz rom-manager
+          mkdir -p dist/tabularium
+          cp target/release/tabularium dist/tabularium/
+          cp packaging/linux/tabularium.desktop packaging/linux/install.sh dist/tabularium/
+          cp assets/icon-256.png dist/tabularium/tabularium.png
+          tar -C dist -czf tabularium-linux-x86_64.tar.gz tabularium
 
           mkdir -p AppDir/usr/bin
-          cp target/release/rom-manager AppDir/usr/bin/
-          cp packaging/linux/rom-manager.desktop AppDir/
-          cp assets/icon-256.png AppDir/rom-manager.png
-          ln -s usr/bin/rom-manager AppDir/AppRun
+          cp target/release/tabularium AppDir/usr/bin/
+          cp packaging/linux/tabularium.desktop AppDir/
+          cp assets/icon-256.png AppDir/tabularium.png
+          ln -s usr/bin/tabularium AppDir/AppRun
           wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool-x86_64.AppImage
-          ARCH=x86_64 ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir ROM-Manager-x86_64.AppImage
+          ARCH=x86_64 ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir Tabularium-x86_64.AppImage
       - uses: actions/upload-artifact@v4
         with:
-          name: rom-manager-linux
+          name: tabularium-linux
           path: |
-            rom-manager-linux-x86_64.tar.gz
-            ROM-Manager-x86_64.AppImage
+            tabularium-linux-x86_64.tar.gz
+            Tabularium-x86_64.AppImage
 
   windows:
     runs-on: windows-latest
@@ -67,13 +67,13 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force dist/ROM-Manager | Out-Null
-          Copy-Item target/release/rom-manager.exe "dist/ROM-Manager/ROM Manager.exe"
-          Compress-Archive -Path dist/ROM-Manager -DestinationPath rom-manager-windows-x86_64.zip
+          New-Item -ItemType Directory -Force dist/Tabularium | Out-Null
+          Copy-Item target/release/tabularium.exe "dist/Tabularium/Tabularium.exe"
+          Compress-Archive -Path dist/Tabularium -DestinationPath tabularium-windows-x86_64.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: rom-manager-windows
-          path: rom-manager-windows-x86_64.zip
+          name: tabularium-windows
+          path: tabularium-windows-x86_64.zip
 
   macos:
     # Paused: only runs when started by hand (Actions > Build > Run workflow).
@@ -95,22 +95,22 @@ jobs:
           cargo build --release --locked --target x86_64-apple-darwin
       - name: Package (.app in a .dmg)
         run: |
-          APP="dist/ROM Manager.app"
+          APP="dist/Tabularium.app"
           mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-          lipo -create -output "$APP/Contents/MacOS/rom-manager" \
-            target/aarch64-apple-darwin/release/rom-manager \
-            target/x86_64-apple-darwin/release/rom-manager
+          lipo -create -output "$APP/Contents/MacOS/tabularium" \
+            target/aarch64-apple-darwin/release/tabularium \
+            target/x86_64-apple-darwin/release/tabularium
           VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
           sed "s/VERSION/$VERSION/g" packaging/macos/Info.plist > "$APP/Contents/Info.plist"
           cp assets/icon.icns "$APP/Contents/Resources/icon.icns"
           # Ad-hoc signature (required for Apple Silicon); not notarised.
           codesign --force --deep --sign - "$APP"
           ln -s /Applications dist/Applications
-          hdiutil create -volname "ROM Manager" -srcfolder dist -ov -format UDZO rom-manager-macos-universal.dmg
+          hdiutil create -volname "Tabularium" -srcfolder dist -ov -format UDZO tabularium-macos-universal.dmg
       - uses: actions/upload-artifact@v4
         with:
-          name: rom-manager-macos
-          path: rom-manager-macos-universal.dmg
+          name: tabularium-macos
+          path: tabularium-macos-universal.dmg
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')

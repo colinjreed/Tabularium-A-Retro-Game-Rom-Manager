@@ -2,10 +2,10 @@ use crate::app::RomApp;
 use crate::jobs::{Job, JobOutput};
 use crate::widgets::{self, card, page_title, section};
 use egui::{RichText, Ui};
-use rom_manager_core::import::{import, ImportOptions, ImportReport};
-use rom_manager_core::library::Library;
-use rom_manager_core::systems;
 use std::path::PathBuf;
+use tabularium_core::import::{import, ImportOptions, ImportReport};
+use tabularium_core::library::Library;
+use tabularium_core::systems;
 
 pub struct ImportPage {
     pub sources: Vec<PathBuf>,
@@ -165,7 +165,7 @@ impl RomApp {
             return;
         };
         let opts = ImportOptions {
-            fetch: Some(rom_manager_core::http::default_fetcher()),
+            fetch: Some(tabularium_core::http::default_fetcher()),
             move_files: self.import.move_files,
             dry_run,
             forced_system: self.import.forced.and_then(systems::get),

@@ -1,11 +1,11 @@
 //! Reusable UI pieces: system picker, filter editor, headings.
 
 use egui::{Color32, RichText, Ui};
-use rom_manager_core::filters::{FilterSpec, COMMON_REGIONS};
-use rom_manager_core::library::SystemStats;
-use rom_manager_core::naming::{flag_description, ALL_FLAGS, DEFAULT_JUNK};
-use rom_manager_core::systems;
 use std::collections::BTreeMap;
+use tabularium_core::filters::{FilterSpec, COMMON_REGIONS};
+use tabularium_core::library::SystemStats;
+use tabularium_core::naming::{flag_description, ALL_FLAGS, DEFAULT_JUNK};
+use tabularium_core::systems;
 
 pub fn page_title(ui: &mut Ui, title: &str, subtitle: &str) {
     ui.add_space(4.0);

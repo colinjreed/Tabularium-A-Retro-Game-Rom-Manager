@@ -14,7 +14,9 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-pub const MANIFEST_DIR: &str = ".rom-manager";
+pub const MANIFEST_DIR: &str = ".tabularium";
+/// Where earlier versions (as "ROM Manager") kept card manifests.
+const OLD_MANIFEST_DIR: &str = ".rom-manager";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
@@ -521,7 +523,11 @@ pub fn export(
     }
 
     let manifest_path = dest.join(MANIFEST_DIR).join(format!("{}.json", col.name));
+    let old_manifest = dest
+        .join(OLD_MANIFEST_DIR)
+        .join(format!("{}.json", col.name));
     let previous: BTreeSet<String> = fs::read(&manifest_path)
+        .or_else(|_| fs::read(&old_manifest))
         .ok()
         .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
         .and_then(|v| serde_json::from_value(v["files"].clone()).ok())
