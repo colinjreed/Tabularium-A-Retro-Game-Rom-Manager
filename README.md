@@ -12,6 +12,15 @@ collection, weeds out duplicates and junk, downloads artwork, checks BIOS
 files, and builds ready-to-use SD cards for handhelds (Onion OS, muOS,
 ArkOS/ROCKNIX, Knulli/Batocera, NextUI/MinUI and ES-DE).
 
+### Why "Tabularium"?
+
+The Tabularium was ancient Rome's public records office. It was built on
+the Capitoline Hill in 78 BC, overlooking the Forum, to hold the state's
+official records. The name comes from *tabulae*, the tablets those records
+were written on. This app does the same job for a game collection: one
+carefully catalogued archive of your ROMs, artwork and BIOS files, from
+which you can carry a selection out to each handheld.
+
 ![Library view](docs/screenshots/library.png)
 
 ## Download
