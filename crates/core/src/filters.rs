@@ -57,6 +57,14 @@ pub struct FilterSpec {
     pub exclude_titles: Vec<String>,
     pub one_game_one_rom: bool,
     pub region_priority: Vec<String>,
+    /// Keep only these genres (empty = any).
+    pub genres: Vec<String>,
+    /// Keep only games with at least one of these tags (empty = any).
+    pub tags: Vec<String>,
+    /// Leave out games with any of these tags.
+    pub exclude_tags: Vec<String>,
+    /// Leave out games marked played or finished.
+    pub only_unplayed: bool,
 }
 
 impl Default for FilterSpec {
@@ -69,6 +77,10 @@ impl Default for FilterSpec {
             exclude_titles: vec![],
             one_game_one_rom: false,
             region_priority: default_priority(),
+            genres: vec![],
+            tags: vec![],
+            exclude_tags: vec![],
+            only_unplayed: false,
         }
     }
 }
@@ -81,6 +93,10 @@ impl FilterSpec {
             && self.include_titles.is_empty()
             && self.exclude_titles.is_empty()
             && !self.one_game_one_rom
+            && self.genres.is_empty()
+            && self.tags.is_empty()
+            && self.exclude_tags.is_empty()
+            && !self.only_unplayed
     }
 }
 
@@ -155,6 +171,21 @@ pub fn rejection_reason(rom: &Rom, spec: &FilterSpec) -> Option<String> {
         && !rom.languages.iter().any(|l| wanted.contains(l))
     {
         return Some(format!("language: {}", rom.languages.join(", ")));
+    }
+    if spec.only_unplayed && rom.played > 0 {
+        return Some(crate::library::played_label(rom.played).to_lowercase());
+    }
+    if !spec.genres.is_empty() && !rom.genre.as_ref().is_some_and(|g| spec.genres.contains(g)) {
+        return Some(format!(
+            "genre: {}",
+            rom.genre.as_deref().unwrap_or("unknown")
+        ));
+    }
+    if !spec.tags.is_empty() && !spec.tags.iter().any(|t| rom.tags.contains(t)) {
+        return Some("doesn't have the chosen tags".into());
+    }
+    if let Some(t) = spec.exclude_tags.iter().find(|t| rom.tags.contains(*t)) {
+        return Some(format!("tagged '{t}'"));
     }
     if non_empty(&spec.include_titles).next().is_some() && !matches_any(rom, &spec.include_titles) {
         return Some("not in include list".into());

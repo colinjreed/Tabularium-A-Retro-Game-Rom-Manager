@@ -139,8 +139,63 @@ fn edit_list(ui: &mut Ui, list: &mut Vec<String>, sep: &str, hint: &str, multili
 }
 
 /// Editor for a FilterSpec. Returns true when anything changed.
-pub fn filter_editor(ui: &mut Ui, id: &str, spec: &mut FilterSpec) -> bool {
+pub fn filter_editor(
+    ui: &mut Ui,
+    id: &str,
+    spec: &mut FilterSpec,
+    genres: &[(String, u64)],
+    tags: &[(String, u64)],
+) -> bool {
     let mut changed = false;
+
+    section(ui, "Genres, tags and played");
+    changed |= ui
+        .checkbox(&mut spec.only_unplayed, "Only games I haven't played")
+        .changed();
+    let toggle_list =
+        |ui: &mut Ui, list: &mut Vec<String>, items: &[(String, u64)], prefix: &str| {
+            let mut ch = false;
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing.x = 14.0;
+                for (name, n) in items {
+                    let mut on = list.contains(name);
+                    if ui
+                        .checkbox(&mut on, format!("{prefix}{name} ({n})"))
+                        .changed()
+                    {
+                        if on {
+                            list.push(name.clone());
+                        } else {
+                            list.retain(|x| x != name);
+                        }
+                        ch = true;
+                    }
+                }
+            });
+            ch
+        };
+    if genres.is_empty() {
+        ui.label(
+            RichText::new("No genres yet: they're filled in when you import or download artwork.")
+                .weak(),
+        );
+    } else {
+        ui.label("Only these genres (none ticked = any):");
+        changed |= toggle_list(ui, &mut spec.genres, genres, "");
+    }
+    if !tags.is_empty() {
+        ui.label("Only games with one of these tags (none ticked = any):");
+        changed |= toggle_list(ui, &mut spec.tags, tags, "#");
+        ui.label("Leave out games with these tags:");
+        let mut ex = spec.exclude_tags.clone();
+        let c = ui
+            .push_id(format!("{id}-ex"), |ui| toggle_list(ui, &mut ex, tags, "#"))
+            .inner;
+        if c {
+            spec.exclude_tags = ex;
+            changed = true;
+        }
+    }
 
     section(ui, "Unwanted releases");
     ui.horizontal(|ui| {

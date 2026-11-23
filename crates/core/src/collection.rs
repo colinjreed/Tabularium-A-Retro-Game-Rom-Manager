@@ -30,8 +30,16 @@ pub struct Collection {
     pub art_kind: Option<String>,
     pub multidisc_m3u: bool,
     pub folder_overrides: BTreeMap<String, String>,
-    pub include_ids: Vec<i64>,
+    /// Hand-picked games: always on the card, whatever the rules say.
+    #[serde(alias = "include_ids")]
+    pub picked: Vec<i64>,
     pub exclude_ids: Vec<i64>,
+    /// Also add games chosen by the rules (systems + filters).
+    pub use_rules: bool,
+    /// Pick this many games at random from those the rules match.
+    pub random_count: Option<usize>,
+    /// Seed for the random pick, so the choice stays put until reshuffled.
+    pub random_seed: u64,
 }
 
 impl Default for Collection {
@@ -46,8 +54,11 @@ impl Default for Collection {
             art_kind: None,
             multidisc_m3u: true,
             folder_overrides: BTreeMap::new(),
-            include_ids: vec![],
+            picked: vec![],
             exclude_ids: vec![],
+            use_rules: true,
+            random_count: None,
+            random_seed: 1,
         }
     }
 }
@@ -147,19 +158,56 @@ fn units(roms: Vec<Rom>) -> Vec<Vec<Rom>> {
         .collect()
 }
 
+/// Small deterministic shuffle (splitmix64), so a seed always gives the same pick.
+fn shuffle<T>(items: &mut [T], seed: u64) {
+    let mut state = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    let mut next = || {
+        state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    };
+    for i in (1..items.len()).rev() {
+        let j = (next() % (i as u64 + 1)) as usize;
+        items.swap(i, j);
+    }
+}
+
 pub fn resolve(lib: &Library, col: &Collection) -> Result<Selection> {
-    let pool = lib.roms(&col.systems, "active")?;
-    let (mut kept, mut rejected) = filters::apply(pool, &col.filters);
-    let kept_ids: HashSet<i64> = kept.iter().map(|r| r.id).collect();
-    for id in &col.include_ids {
-        if !kept_ids.contains(id) {
-            if let Ok(r) = lib.get(*id) {
-                if r.status == "active" {
-                    kept.push(r);
-                }
+    // Hand-picked games come first and ignore the rules.
+    let mut picked: Vec<Rom> = vec![];
+    for id in &col.picked {
+        if let Ok(r) = lib.get(*id) {
+            if r.status == "active" && !picked.iter().any(|p: &Rom| p.id == r.id) {
+                picked.push(r);
             }
         }
     }
+    let picked_ids: HashSet<i64> = picked.iter().map(|r| r.id).collect();
+    let (mut kept, mut rejected) = if col.use_rules {
+        let pool: Vec<Rom> = lib
+            .roms(&col.systems, "active")?
+            .into_iter()
+            .filter(|r| !picked_ids.contains(&r.id))
+            .collect();
+        filters::apply(pool, &col.filters)
+    } else {
+        (vec![], vec![])
+    };
+    if let (true, Some(n)) = (col.use_rules, col.random_count) {
+        let mut groups = units(kept);
+        shuffle(&mut groups, col.random_seed);
+        let not_chosen: Vec<Rom> = groups.iter().skip(n).flatten().cloned().collect();
+        rejected.extend(not_chosen.into_iter().map(|rom| filters::Rejected {
+            rom,
+            reason: "not in this random pick".into(),
+        }));
+        kept = groups.into_iter().take(n).flatten().collect();
+    }
+    let mut all = picked;
+    all.extend(kept);
+    let mut kept = all;
     if !col.exclude_ids.is_empty() {
         let (ex, keep): (Vec<Rom>, Vec<Rom>) = kept
             .into_iter()
@@ -174,9 +222,10 @@ pub fn resolve(lib: &Library, col: &Collection) -> Result<Selection> {
     if let Some(budget) = col.max_size {
         let all = units(kept);
         let is_prio = |u: &Vec<Rom>| {
-            !col.priority_titles.is_empty()
-                && u.iter()
-                    .any(|r| filters::matches_any(r, &col.priority_titles))
+            u.iter().any(|r| picked_ids.contains(&r.id))
+                || (!col.priority_titles.is_empty()
+                    && u.iter()
+                        .any(|r| filters::matches_any(r, &col.priority_titles)))
         };
         let (prio, rest): (Vec<_>, Vec<_>) = all.into_iter().partition(|u| is_prio(u));
         // Round-robin across systems so one big system can't starve the others.
@@ -221,6 +270,8 @@ pub struct ExportOptions {
     pub art: bool,
     pub bios: bool,
     pub ignore_free_space: bool,
+    /// Read play history from the card before copying.
+    pub read_history: bool,
 }
 
 impl Default for ExportOptions {
@@ -231,6 +282,7 @@ impl Default for ExportOptions {
             art: true,
             bios: true,
             ignore_free_space: false,
+            read_history: true,
         }
     }
 }
@@ -245,6 +297,7 @@ pub struct ExportReport {
     pub removed: usize,
     pub bytes_copied: u64,
     pub bios: bios::InstallReport,
+    pub history: Option<crate::playhistory::PlayReport>,
     pub warnings: Vec<String>,
     pub planned: Vec<String>,
     pub cancelled: bool,
@@ -373,6 +426,18 @@ pub fn export(
 ) -> Result<ExportReport> {
     let profile = col.profile();
     let art_kind = col.art_kind.clone().unwrap_or_else(|| "boxart".into());
+    // Pick up what was played on the card before touching it.
+    let history = if opts.read_history && dest.exists() {
+        match crate::playhistory::read_card(lib, dest, profile, &col.folder_overrides, rep) {
+            Ok(h) => Some(h),
+            Err(e) => {
+                rep.log(format!("Couldn't read play history: {e}"));
+                None
+            }
+        }
+    } else {
+        None
+    };
     let sel = resolve(lib, col)?;
     if !opts.dry_run {
         fs::create_dir_all(dest)?;
@@ -397,6 +462,7 @@ pub fn export(
         report: ExportReport::default(),
     };
     w.report.roms = sel.roms.len();
+    w.report.history = history;
     let mut gamelists: BTreeMap<String, Vec<GamelistEntry>> = BTreeMap::new();
     let mut warnings: BTreeSet<String> = BTreeSet::new();
     let all_units = units(sel.roms.clone());

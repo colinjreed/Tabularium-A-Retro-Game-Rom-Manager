@@ -244,3 +244,23 @@ pub fn gamelist_games(path: &Path) -> Vec<(String, Option<String>, Option<String
         })
         .collect()
 }
+
+/// (path, play count, last played) for every game in a gamelist.xml.
+pub fn gamelist_play_info(path: &Path) -> Vec<(String, u32, Option<String>)> {
+    load(path)
+        .children
+        .iter()
+        .filter_map(|n| n.as_element())
+        .filter(|g| g.name == "game")
+        .map(|g| {
+            let count = child_text(g, "playcount")
+                .and_then(|c| c.trim().parse().ok())
+                .unwrap_or(0);
+            (
+                child_text(g, "path").unwrap_or_default(),
+                count,
+                child_text(g, "lastplayed"),
+            )
+        })
+        .collect()
+}

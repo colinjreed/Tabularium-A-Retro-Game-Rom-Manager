@@ -13,6 +13,7 @@ pub mod import;
 pub mod library;
 pub mod metadata;
 pub mod naming;
+pub mod playhistory;
 pub mod profiles;
 pub mod progress;
 pub mod rename;

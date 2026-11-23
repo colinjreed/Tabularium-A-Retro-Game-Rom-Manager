@@ -56,7 +56,7 @@ impl RomApp {
                     if systems_picker(ui, "clean-systems", &mut self.clean.systems, &self.data.stats) {
                         self.clean.results = None;
                     }
-                    if filter_editor(ui, "clean", &mut self.clean.spec) {
+                    if filter_editor(ui, "clean", &mut self.clean.spec, &self.data.genres, &self.data.tags) {
                         self.clean.results = None;
                     }
                     ui.add_space(8.0);

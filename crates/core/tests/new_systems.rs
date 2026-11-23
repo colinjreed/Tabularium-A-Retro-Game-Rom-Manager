@@ -375,6 +375,7 @@ fn live_arcade_art() {
         status_reason: None,
         alt_name: Some("Street Fighter II: The World Warrior (World 910522)".into()),
         source: None,
+        ..Default::default()
     };
     let img = sc
         .fetch(&rom, systems::get("arcade").unwrap(), "boxart")

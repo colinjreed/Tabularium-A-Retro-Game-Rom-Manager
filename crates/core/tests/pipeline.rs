@@ -464,6 +464,7 @@ fn screenscraper_queries_once_per_rom() {
         status_reason: None,
         alt_name: None,
         source: None,
+        ..Default::default()
     };
     let gb = systems::get("gb").unwrap();
     assert_eq!(

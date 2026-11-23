@@ -123,6 +123,36 @@ impl RomApp {
             }
         });
 
+        ui.add_space(10.0);
+        card(ui, |ui| {
+            section(ui, "Genres");
+            let known = self.data.roms.iter().filter(|r| r.genre.is_some()).count();
+            ui.label(format!(
+                "{known} of {} games have a genre. Genres come from libretro's lists for cartridge \
+                 systems and are filled in automatically on import; use this for games imported earlier.",
+                self.data.roms.len()
+            ));
+            if ui
+                .add_enabled(!self.busy(), egui::Button::new("Look up genres"))
+                .clicked()
+            {
+                let Some(root) = self.library_root() else {
+                    return;
+                };
+                self.job =
+                    Some(Job::spawn(
+                        "Looking up genres",
+                        ui.ctx(),
+                        move |rep| match Library::open(&root).and_then(|lib| {
+                            tabularium_core::metadata::enrich_genres(&lib, &default_fetcher(), rep)
+                        }) {
+                            Ok(n) => JobOutput::Genres(n),
+                            Err(e) => JobOutput::Error(e.to_string()),
+                        },
+                    ));
+            }
+        });
+
         if let Some(r) = &self.artwork.result {
             ui.add_space(10.0);
             card(ui, |ui| {

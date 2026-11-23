@@ -86,6 +86,35 @@ your messy folders ──Import──▶ LIBRARY (sorted by system, indexed)
 
 ![SD card setup](docs/screenshots/sd-card.png)
 
+### Mixtapes, tags and play tracking
+
+* **Hand-picked games:** select games in the Library and use *Add to SD
+  card*, or search for them in a card's *Hand-picked games* section.
+  Hand-picked games always go on the card. Untick *Also add games by
+  rules* for a card that holds only your picks, like a mixtape, or keep
+  rules on to combine both: e.g. 12 favourites plus 30 random unplayed
+  RPGs.
+* **Selecting several games:** Ctrl-click (⌘-click on a Mac) or Shift-click
+  in the Library. Then tag them, mark them played, add them to a card or
+  trash them all at once.
+* **Genres:** filled in automatically for cartridge systems from libretro's
+  genre lists (looked up by checksum), and editable by hand. For games
+  imported before this feature, use *Artwork → Look up genres*.
+* **Tags:** your own labels (`#co-op`, `#short`, `#comfort`…). Filter by
+  them in the Library, and use them in a card's rules: include games with
+  a tag, or leave them out.
+* **Played / Finished:** mark games yourself, or let Tabularium read play
+  history back from your cards. EmulationStation-based firmware (ArkOS,
+  ROCKNIX, Knulli/Batocera, ES-DE) records it in `gamelist.xml`, and Onion
+  OS in its play-activity database. The history is read every time you
+  copy to a card, or on demand with *Read play history now*. It only ever
+  adds to what the library knows, and never marks a game unplayed.
+* **Random picks:** a card can take *N random games* from whatever its
+  rules match. Combine it with *Only games I haven't played* for a
+  rotating selection, and press *Reshuffle* for a different set. In the
+  Library, *🎲 Surprise me* picks a random unplayed game from the current
+  list.
+
 ## Supported handheld firmware
 
 | Firmware | Devices | ROMs | Artwork | BIOS |

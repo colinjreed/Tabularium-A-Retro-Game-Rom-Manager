@@ -23,6 +23,8 @@ pub enum JobOutput {
         dry_run: bool,
     },
     BiosImport(Vec<(PathBuf, ImportOutcome)>),
+    History(tabularium_core::playhistory::PlayReport),
+    Genres(usize),
     Rename {
         report: tabularium_core::rename::FixReport,
         applied: bool,

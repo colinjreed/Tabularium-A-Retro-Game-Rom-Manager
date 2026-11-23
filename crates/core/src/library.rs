@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS media (
 
 const SUBDIRS: &[&str] = &["roms", "media", "trash", "unsorted", "collections", "bios"];
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Rom {
     pub id: i64,
     pub system: String,
@@ -82,6 +82,26 @@ pub struct Rom {
     pub alt_name: Option<String>,
     /// Where the file was imported from.
     pub source: Option<String>,
+    /// Genre from libretro's genre lists (or set by hand).
+    pub genre: Option<String>,
+    /// 0 = not played, 1 = played, 2 = finished.
+    pub played: u8,
+    pub play_count: u32,
+    /// Unix time of the last play we know of.
+    pub last_played: Option<f64>,
+    pub tags: BTreeSet<String>,
+}
+
+pub const NOT_PLAYED: u8 = 0;
+pub const PLAYED: u8 = 1;
+pub const FINISHED: u8 = 2;
+
+pub fn played_label(state: u8) -> &'static str {
+    match state {
+        PLAYED => "Played",
+        FINISHED => "Finished",
+        _ => "Not played",
+    }
 }
 
 impl Rom {
@@ -109,6 +129,11 @@ impl Rom {
             status_reason: r.get("status_reason")?,
             alt_name: r.get("alt_name").unwrap_or(None),
             source: r.get("source").unwrap_or(None),
+            genre: r.get("genre").unwrap_or(None),
+            played: r.get::<_, i64>("played").unwrap_or(0) as u8,
+            play_count: r.get::<_, i64>("play_count").unwrap_or(0) as u32,
+            last_played: r.get("last_played").unwrap_or(None),
+            tags: BTreeSet::new(),
         })
     }
 
@@ -242,12 +267,28 @@ impl Library {
         db.execute_batch("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;")?;
         db.execute_batch(SCHEMA)?;
         // Added in 0.3: full names for arcade sets (from the MAME/FBNeo lists).
-        let has_alt: bool = db
-            .prepare("SELECT 1 FROM pragma_table_info('roms') WHERE name = 'alt_name'")?
-            .exists([])?;
-        if !has_alt {
-            db.execute_batch("ALTER TABLE roms ADD COLUMN alt_name TEXT")?;
+        // Columns added in later versions; older libraries are upgraded in place.
+        for (col, decl) in [
+            ("alt_name", "TEXT"),
+            ("genre", "TEXT"),
+            ("played", "INTEGER NOT NULL DEFAULT 0"),
+            ("play_count", "INTEGER NOT NULL DEFAULT 0"),
+            ("last_played", "REAL"),
+        ] {
+            let exists: bool = db
+                .prepare("SELECT 1 FROM pragma_table_info('roms') WHERE name = ?1")?
+                .exists([col])?;
+            if !exists {
+                db.execute_batch(&format!("ALTER TABLE roms ADD COLUMN {col} {decl}"))?;
+            }
         }
+        db.execute_batch(
+            "CREATE TABLE IF NOT EXISTS rom_tags (
+                rom_id INTEGER NOT NULL REFERENCES roms(id) ON DELETE CASCADE,
+                tag TEXT NOT NULL,
+                PRIMARY KEY (rom_id, tag)
+            );",
+        )?;
         for d in SUBDIRS {
             let _ = fs::create_dir_all(root.join(d));
         }
@@ -281,7 +322,100 @@ impl Library {
         sql += " ORDER BY system, COALESCE(alt_name, stem) COLLATE NOCASE";
         let mut st = self.db.prepare(&sql)?;
         let rows = st.query_map([status], Rom::from_row)?;
-        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+        let mut roms = rows.collect::<rusqlite::Result<Vec<_>>>()?;
+        let tags = self.tag_map()?;
+        for r in &mut roms {
+            if let Some(t) = tags.get(&r.id) {
+                r.tags = t.clone();
+            }
+        }
+        Ok(roms)
+    }
+
+    fn tag_map(&self) -> Result<std::collections::HashMap<i64, BTreeSet<String>>> {
+        let mut st = self.db.prepare("SELECT rom_id, tag FROM rom_tags")?;
+        let mut out: std::collections::HashMap<i64, BTreeSet<String>> = Default::default();
+        for row in st.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))? {
+            let (id, tag) = row?;
+            out.entry(id).or_default().insert(tag);
+        }
+        Ok(out)
+    }
+
+    // ------------------------------------------------------------ tags & play state
+    pub fn add_tag(&self, ids: &[i64], tag: &str) -> Result<()> {
+        let tag = tag.trim();
+        if tag.is_empty() {
+            return Ok(());
+        }
+        for id in ids {
+            self.db.execute(
+                "INSERT OR IGNORE INTO rom_tags VALUES (?1, ?2)",
+                params![id, tag],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn remove_tag(&self, ids: &[i64], tag: &str) -> Result<()> {
+        for id in ids {
+            self.db.execute(
+                "DELETE FROM rom_tags WHERE rom_id = ?1 AND tag = ?2",
+                params![id, tag],
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Every tag in use, with how many active ROMs carry it.
+    pub fn all_tags(&self) -> Result<Vec<(String, u64)>> {
+        let mut st = self.db.prepare(
+            "SELECT t.tag, COUNT(*) FROM rom_tags t JOIN roms r ON r.id = t.rom_id \
+             WHERE r.status = 'active' GROUP BY t.tag ORDER BY t.tag COLLATE NOCASE",
+        )?;
+        let rows = st.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn all_genres(&self) -> Result<Vec<(String, u64)>> {
+        let mut st = self.db.prepare(
+            "SELECT genre, COUNT(*) FROM roms WHERE status = 'active' AND genre IS NOT NULL \
+             GROUP BY genre ORDER BY genre COLLATE NOCASE",
+        )?;
+        let rows = st.query_map([], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn set_genre(&self, id: i64, genre: Option<&str>) -> Result<()> {
+        let g = genre.map(str::trim).filter(|g| !g.is_empty());
+        self.db
+            .execute("UPDATE roms SET genre = ?1 WHERE id = ?2", params![g, id])?;
+        Ok(())
+    }
+
+    pub fn set_played(&self, ids: &[i64], state: u8) -> Result<()> {
+        for id in ids {
+            self.db.execute(
+                "UPDATE roms SET played = ?1 WHERE id = ?2",
+                params![state as i64, id],
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Merge play history read from a device: never lowers what we know.
+    pub fn record_play(&self, id: i64, count: u32, last: Option<f64>) -> Result<bool> {
+        let changed = self.db.execute(
+            "UPDATE roms SET played = MAX(played, 1), play_count = MAX(play_count, ?1), \
+             last_played = CASE WHEN ?2 IS NULL THEN last_played ELSE MAX(COALESCE(last_played, 0), ?2) END \
+             WHERE id = ?3 AND (played = 0 OR play_count < ?1 OR COALESCE(last_played, 0) < COALESCE(?2, 0))",
+            params![count as i64, last, id],
+        )?;
+        Ok(changed > 0)
     }
 
     pub fn active(&self) -> Result<Vec<Rom>> {
@@ -292,6 +426,14 @@ impl Library {
         self.db
             .query_row("SELECT * FROM roms WHERE id = ?1", [id], Rom::from_row)
             .optional()?
+            .map(|mut r| {
+                r.tags = self
+                    .tag_map()
+                    .ok()
+                    .and_then(|m| m.get(&id).cloned())
+                    .unwrap_or_default();
+                r
+            })
             .ok_or_else(|| Error::Other(format!("No ROM with id {id}")))
     }
 

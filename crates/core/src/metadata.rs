@@ -193,7 +193,96 @@ pub fn enrich(lib: &Library, fetch: &Fetcher, rep: &dyn Reporter) -> Result<()> 
             }
         }
     }
+    enrich_genres(lib, fetch, rep)?;
     Ok(())
+}
+
+// ------------------------------------------------------------------ genres
+
+/// CRC -> genre from a libretro genre DAT.
+pub fn parse_genre_dat(text: &str) -> HashMap<String, String> {
+    let re =
+        Regex::new(r#"(?s)game \(.*?genre "([^"]+)".*?rom \([^)]*?crc ([0-9A-Fa-f]{8})"#).unwrap();
+    let mut out = HashMap::new();
+    for c in re.captures_iter(text) {
+        out.entry(c[2].to_lowercase())
+            .or_insert_with(|| c[1].to_string());
+    }
+    out
+}
+
+fn genre_url(system: &str) -> Option<String> {
+    let s = systems::get(system)?;
+    if s.disc_based || systems::is_arcade(system) || systems::folder_games(system) {
+        return None;
+    }
+    let enc =
+        percent_encoding::utf8_percent_encode(s.libretro?, percent_encoding::NON_ALPHANUMERIC);
+    Some(format!("{DB}/metadat/genre/{enc}.dat"))
+}
+
+fn genre_map(cache: &Path, system: &str, fetch: &Fetcher) -> Option<HashMap<String, String>> {
+    let url = genre_url(system)?;
+    let path = cache.join("genre").join(format!("{system}.json"));
+    if fresh(&path) {
+        if let Some(m) = fs::read(&path)
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+        {
+            return Some(m);
+        }
+    }
+    match fetch(&url) {
+        Ok(Some(body)) => {
+            let map = parse_genre_dat(&String::from_utf8_lossy(&body));
+            let _ = fs::create_dir_all(path.parent().unwrap());
+            let _ = fs::write(&path, serde_json::to_vec(&map).unwrap());
+            Some(map)
+        }
+        _ => fs::read(&path)
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok()),
+    }
+}
+
+/// Fill in genres for ROMs that don't have one yet. Returns how many were found.
+pub fn enrich_genres(lib: &Library, fetch: &Fetcher, rep: &dyn Reporter) -> Result<usize> {
+    let roms: Vec<_> = lib
+        .active()?
+        .into_iter()
+        .filter(|r| r.genre.is_none() && r.crc.is_some())
+        .collect();
+    let cache = cache_dir(lib);
+    let mut by_sys: HashMap<String, Vec<&crate::library::Rom>> = HashMap::new();
+    for r in &roms {
+        by_sys.entry(r.system.clone()).or_default().push(r);
+    }
+    let mut found = 0;
+    for (sys, list) in by_sys {
+        if genre_url(&sys).is_none() {
+            continue;
+        }
+        rep.progress(
+            0,
+            0,
+            &format!("Looking up genres: {}", systems::name_of(&sys)),
+        );
+        let Some(map) = genre_map(&cache, &sys, fetch) else {
+            continue;
+        };
+        for r in list {
+            let path = lib.abspath(&r.path);
+            let crcs = crate::dats::candidate_crcs(&path, r.crc.as_deref().unwrap_or(""));
+            if let Some(g) = crcs.iter().find_map(|c| map.get(c)) {
+                lib.set_genre(r.id, Some(g))?;
+                found += 1;
+            }
+        }
+    }
+    if found > 0 {
+        rep.log(format!("Found genres for {found} game(s)."));
+    }
+    Ok(found)
 }
 
 #[cfg(test)]
@@ -229,6 +318,10 @@ game (
 	rom ( name "monkey2.scummvm" size 7 crc 0 )
 )
 "#;
+        let g = parse_genre_dat(
+            "game (\n\tcomment \"3 Ninjas Kick Back (USA)\"\n\tgenre \"Platform\"\n\trom ( crc F2EE11F9 )\n)\n",
+        );
+        assert_eq!(g["f2ee11f9"], "Platform");
         let s = parse_scummvm_dat(scumm);
         assert_eq!(s[0].1, "monkey2");
         let ids: HashMap<String, String> =

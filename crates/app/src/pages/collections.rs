@@ -34,6 +34,18 @@ pub struct CollectionsPage {
 }
 
 impl CollectionsPage {
+    /// Keep the open editor in step when games are added from the Library.
+    pub fn note_picked(&mut self, card: &str, ids: &[i64]) {
+        if let Some(c) = self.current.as_mut().filter(|c| c.name == card) {
+            for id in ids {
+                if !c.picked.contains(id) {
+                    c.picked.push(*id);
+                }
+            }
+        }
+        self.mark_dirty();
+    }
+
     pub fn mark_dirty(&mut self) {
         self.recompute_at = Some(0.0);
     }
@@ -296,18 +308,125 @@ impl RomApp {
 
         ui.add_space(8.0);
         card(ui, |ui| {
-            section(ui, "Systems");
-            changed |= systems_picker(ui, "card-systems", &mut col.systems, &stats);
+            section(ui, "Hand-picked games");
+            ui.label(
+                RichText::new(
+                    "Always on this card. Search below, or select games in the Library and use \
+                     'Add to SD card'.",
+                )
+                .weak(),
+            );
+            let roms = &self.data.roms;
+            let mut remove = None;
+            for (i, id) in col.picked.iter().enumerate() {
+                let Some(r) = roms.iter().find(|r| r.id == *id) else {
+                    continue;
+                };
+                ui.horizontal(|ui| {
+                    if ui
+                        .small_button("×")
+                        .on_hover_text("Take off this card")
+                        .clicked()
+                    {
+                        remove = Some(i);
+                    }
+                    ui.label(r.display_name());
+                    ui.label(RichText::new(systems::name_of(&r.system)).weak());
+                });
+            }
+            if let Some(i) = remove {
+                col.picked.remove(i);
+                changed = true;
+            }
+            let key = egui::Id::unique("pick-search");
+            let mut q: String = ui.data_mut(|d| d.get_temp(key)).unwrap_or_default();
+            ui.add(
+                egui::TextEdit::singleline(&mut q)
+                    .hint_text("🔍 find a game to add…")
+                    .desired_width(280.0),
+            );
+            let ql = q.trim().to_lowercase();
+            if ql.len() >= 2 {
+                let hits: Vec<&tabularium_core::library::Rom> = roms
+                    .iter()
+                    .filter(|r| !col.picked.contains(&r.id))
+                    .filter(|r| {
+                        r.stem.to_lowercase().contains(&ql)
+                            || r.alt_name
+                                .as_ref()
+                                .is_some_and(|a| a.to_lowercase().contains(&ql))
+                    })
+                    .take(12)
+                    .collect();
+                if hits.is_empty() {
+                    ui.label(RichText::new("No matches").weak());
+                }
+                for r in hits {
+                    ui.horizontal(|ui| {
+                        if ui.small_button("+").clicked() {
+                            col.picked.push(r.id);
+                            changed = true;
+                        }
+                        ui.label(r.display_name());
+                        ui.label(RichText::new(systems::name_of(&r.system)).weak());
+                    });
+                }
+            }
+            ui.data_mut(|d| d.insert_temp(key, q));
         });
 
         ui.add_space(8.0);
         card(ui, |ui| {
-            ui.label(
-                RichText::new("Which versions of each game")
-                    .strong()
-                    .size(15.0),
+            changed |= ui
+                .checkbox(
+                    &mut col.use_rules,
+                    RichText::new("Also add games by rules").strong().size(15.0),
+                )
+                .on_hover_text(
+                    "Untick for a card that holds only your hand-picked games (a mixtape).",
+                )
+                .changed();
+            if !col.use_rules {
+                return;
+            }
+            section(ui, "Systems");
+            changed |= systems_picker(ui, "card-systems", &mut col.systems, &stats);
+            changed |= filter_editor(
+                ui,
+                "card",
+                &mut col.filters,
+                &self.data.genres,
+                &self.data.tags,
             );
-            changed |= filter_editor(ui, "card", &mut col.filters);
+            section(ui, "Random pick");
+            let mut random = col.random_count.is_some();
+            ui.horizontal(|ui| {
+                if ui.checkbox(&mut random, "Pick").changed() {
+                    col.random_count = random.then_some(20);
+                    changed = true;
+                }
+                if let Some(n) = col.random_count.as_mut() {
+                    changed |= ui.add(egui::DragValue::new(n).range(1..=10000)).changed();
+                }
+                ui.label("random games from those the rules match");
+                if col.random_count.is_some() && ui.button("🎲 Reshuffle").clicked() {
+                    col.random_seed = col
+                        .random_seed
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(1442695040888963407);
+                    changed = true;
+                }
+            });
+            if col.random_count.is_some() {
+                ui.label(
+                    RichText::new(
+                        "Tip: with 'Only games I haven't played' ticked above, each copy can bring \
+                         fresh games. Games you play drop off the next time 'Remove games I've taken \
+                         out' runs; your saves stay on the card.",
+                    )
+                    .weak(),
+                );
+            }
         });
 
         ui.add_space(8.0);
@@ -469,6 +588,17 @@ impl RomApp {
         ui.checkbox(&mut o.bios, "Copy BIOS files these systems need");
         ui.checkbox(&mut o.sync, "Remove games I've taken out of this card since last time")
             .on_hover_text("Only removes files this app put on the card. Your saves and other files are never touched.");
+        ui.checkbox(&mut o.read_history, "Read play history from the card first")
+            .on_hover_text("Marks games you've played on the handheld as played in the library (EmulationStation-based firmware and Onion OS).");
+        if ui
+            .add_enabled(
+                self.cards.dest.is_some() && !self.busy(),
+                egui::Button::new("Read play history now"),
+            )
+            .clicked()
+        {
+            self.start_read_history(ui.ctx(), root);
+        }
         ui.horizontal(|ui| {
             let can = self.cards.dest.is_some() && !self.busy() && self.cards.error.is_none();
             if ui
@@ -518,6 +648,17 @@ impl RomApp {
                         "Cancelled part-way. Run it again to finish.",
                     );
                 }
+                if let Some(h) = &rep.history {
+                    if h.found > 0 {
+                        ui.label(format!(
+                            "Play history: {} game(s) played on the card, {} newly marked in the library",
+                            h.found, h.updated
+                        ));
+                    }
+                    for n in &h.notes {
+                        ui.colored_label(widgets::warn_color(ui), n);
+                    }
+                }
                 if !rep.bios.copied.is_empty() {
                     ui.label(format!("BIOS: {}", rep.bios.copied.join(", ")));
                 }
@@ -548,6 +689,28 @@ impl RomApp {
                 }
             });
         }
+    }
+
+    fn start_read_history(&mut self, ctx: &egui::Context, root: &std::path::Path) {
+        let (Some(col), Some(dest)) = (self.cards.current.clone(), self.cards.dest.clone()) else {
+            return;
+        };
+        let root = root.to_path_buf();
+        self.job = Some(Job::spawn("Reading play history", ctx, move |rep| {
+            let res = Library::open(&root).and_then(|lib| {
+                tabularium_core::playhistory::read_card(
+                    &lib,
+                    &dest,
+                    col.profile(),
+                    &col.folder_overrides,
+                    rep,
+                )
+            });
+            match res {
+                Ok(h) => JobOutput::History(h),
+                Err(e) => JobOutput::Error(e.to_string()),
+            }
+        }));
     }
 
     fn start_export(&mut self, ctx: &egui::Context, root: &std::path::Path, dry_run: bool) {

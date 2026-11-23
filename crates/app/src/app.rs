@@ -3,12 +3,12 @@
 use crate::jobs::{Job, JobOutput};
 use crate::pages;
 use crate::settings::Settings;
-use crate::widgets::{self, page_title};
+use crate::widgets;
 use egui::{Color32, RichText, Ui};
 use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
+use tabularium_core::human_size;
 use tabularium_core::library::{Library, Rom, SystemStats};
-use tabularium_core::{human_size, systems};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Page {
@@ -52,17 +52,15 @@ pub struct LibData {
     pub trashed: Vec<Rom>,
     pub stats: BTreeMap<String, SystemStats>,
     pub with_art: HashSet<i64>,
+    pub tags: Vec<(String, u64)>,
+    pub genres: Vec<(String, u64)>,
+    /// SD card (collection) names, for "Add to card".
+    pub cards: Vec<String>,
+    /// Bumped on every reload so cached views refresh.
+    pub version: u64,
 }
 
-#[derive(Default)]
-pub struct LibraryView {
-    pub system: Option<String>,
-    pub search: String,
-    pub show_trash: bool,
-    pub selected: Option<i64>,
-    filtered: Vec<usize>,
-    filter_key: Option<(Option<String>, String, bool, usize)>,
-}
+pub use crate::pages::library::LibraryView;
 
 pub struct RomApp {
     pub settings: Settings,
@@ -147,13 +145,20 @@ impl RomApp {
                 trashed: lib.roms(&[], "trashed")?,
                 stats: lib.stats()?,
                 with_art: lib.roms_with_media("boxart")?,
+                tags: lib.all_tags()?,
+                genres: lib.all_genres()?,
+                cards: tabularium_core::collection::list(lib),
+                version: 0,
             })
         })();
         match res {
-            Ok(d) => self.data = d,
+            Ok(mut d) => {
+                d.version = self.data.version + 1;
+                self.data = d;
+            }
             Err(e) => self.notify_err(e.to_string()),
         }
-        self.view.filter_key = None;
+        self.view.invalidate();
         self.cards.mark_dirty();
         self.bios.lib_status = None;
     }
@@ -204,7 +209,29 @@ impl RomApp {
                 dest,
                 dry_run,
             }) => {
+                if report.history.as_ref().is_some_and(|h| h.updated > 0) {
+                    self.reload();
+                }
                 self.cards.export_result = Some((report, dest, dry_run));
+            }
+            Some(JobOutput::History(h)) => {
+                self.reload();
+                let mut msg = if h.found == 0 {
+                    "No play history found on that card (EmulationStation-based firmware and Onion OS keep it).".to_string()
+                } else {
+                    format!(
+                        "{} game(s) played on the card; {} newly marked as played.",
+                        h.found, h.updated
+                    )
+                };
+                if let Some(n) = h.notes.first() {
+                    msg += &format!(" {n}");
+                }
+                self.notify(msg);
+            }
+            Some(JobOutput::Genres(n)) => {
+                self.reload();
+                self.notify(format!("Found genres for {n} game(s)."));
             }
             Some(JobOutput::Rename { report, applied }) => {
                 if applied {
@@ -412,319 +439,8 @@ impl RomApp {
         });
     }
 
-    // ------------------------------------------------------------------ library page
-
-    fn library_page(&mut self, ui: &mut Ui) {
-        let total: u64 = self.data.stats.values().map(|s| s.count).sum();
-        if total == 0 && self.data.trashed.is_empty() {
-            page_title(ui, "Library", "Your library is empty.");
-            widgets::card(ui, |ui| {
-                ui.label(
-                    "Start by importing the folders where your ROMs are now. They'll be copied in \
-                          and sorted by system; your originals are left alone.",
-                );
-                if ui.button("Go to Import").clicked() {
-                    self.page = Page::Import;
-                }
-            });
-            return;
-        }
-
-        egui::Panel::left("systems-list")
-            .resizable(true)
-            .default_size(210.0)
-            .show(ui, |ui| {
-                ui.add_space(6.0);
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    let all_sel = self.view.system.is_none() && !self.view.show_trash;
-                    if ui
-                        .selectable_label(all_sel, format!("All systems  ({total})"))
-                        .clicked()
-                    {
-                        self.view.system = None;
-                        self.view.show_trash = false;
-                    }
-                    ui.separator();
-                    for (sid, st) in &self.data.stats {
-                        if st.count == 0 {
-                            continue;
-                        }
-                        let sel = self.view.system.as_deref() == Some(sid.as_str())
-                            && !self.view.show_trash;
-                        let label = format!("{}  ({})", systems::name_of(sid), st.count);
-                        if ui
-                            .selectable_label(sel, label)
-                            .on_hover_text(human_size(st.bytes))
-                            .clicked()
-                        {
-                            self.view.system = Some(sid.clone());
-                            self.view.show_trash = false;
-                        }
-                    }
-                    ui.separator();
-                    let n = self.data.trashed.len();
-                    if ui
-                        .selectable_label(self.view.show_trash, format!("🗑 Trash  ({n})"))
-                        .clicked()
-                    {
-                        self.view.show_trash = true;
-                        self.view.system = None;
-                    }
-                });
-            });
-
-        let selected = self.view.selected.and_then(|id| {
-            self.data
-                .roms
-                .iter()
-                .chain(self.data.trashed.iter())
-                .find(|r| r.id == id)
-                .cloned()
-        });
-        if let Some(rom) = &selected {
-            egui::Panel::right("rom-detail")
-                .resizable(true)
-                .default_size(300.0)
-                .show(ui, |ui| {
-                    egui::ScrollArea::vertical().show(ui, |ui| self.rom_detail(ui, rom));
-                });
-        }
-
-        egui::CentralPanel::default().show(ui, |ui| self.rom_table(ui));
-    }
-
-    fn rom_table(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            ui.label("🔍");
-            ui.add(
-                egui::TextEdit::singleline(&mut self.view.search)
-                    .hint_text("Search titles…")
-                    .desired_width(280.0),
-            );
-            if self.view.show_trash && !self.data.trashed.is_empty() {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Empty trash…").clicked() {
-                        self.clean.confirm_empty_trash = true;
-                    }
-                    if ui.button("Restore all").clicked() {
-                        self.restore_roms(self.data.trashed.clone());
-                    }
-                });
-            }
-        });
-        let list = if self.view.show_trash {
-            &self.data.trashed
-        } else {
-            &self.data.roms
-        };
-        let key = (
-            self.view.system.clone(),
-            self.view.search.to_lowercase(),
-            self.view.show_trash,
-            list.len(),
-        );
-        if self.view.filter_key.as_ref() != Some(&key) {
-            self.view.filtered = list
-                .iter()
-                .enumerate()
-                .filter(|(_, r)| key.0.as_ref().is_none_or(|s| &r.system == s))
-                .filter(|(_, r)| {
-                    key.1.is_empty()
-                        || r.stem.to_lowercase().contains(&key.1)
-                        || r.alt_name
-                            .as_ref()
-                            .is_some_and(|a| a.to_lowercase().contains(&key.1))
-                })
-                .map(|(i, _)| i)
-                .collect();
-            self.view.filter_key = Some(key);
-        }
-        ui.label(RichText::new(format!("{} ROMs", self.view.filtered.len())).weak());
-        let show_trash = self.view.show_trash;
-        let rows = self.view.filtered.clone();
-        let mut clicked = None;
-        let text_h = ui.text_style_height(&egui::TextStyle::Body) + 6.0;
-        egui_extras::TableBuilder::new(ui)
-            .striped(true)
-            .sense(egui::Sense::click())
-            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-            .auto_shrink(false)
-            .column(egui_extras::Column::remainder().at_least(160.0).clip(true))
-            .column(
-                egui_extras::Column::initial(120.0)
-                    .at_least(60.0)
-                    .clip(true)
-                    .resizable(true),
-            )
-            .column(
-                egui_extras::Column::initial(100.0)
-                    .at_least(50.0)
-                    .clip(true)
-                    .resizable(true),
-            )
-            .column(egui_extras::Column::exact(70.0))
-            .column(egui_extras::Column::exact(32.0))
-            .header(22.0, |mut h| {
-                h.col(|ui| {
-                    ui.strong("Title");
-                });
-                h.col(|ui| {
-                    ui.strong("System");
-                });
-                h.col(|ui| {
-                    ui.strong(if show_trash { "Why removed" } else { "Region" });
-                });
-                h.col(|ui| {
-                    ui.strong("Size");
-                });
-                h.col(|ui| {
-                    ui.strong("Art");
-                });
-            })
-            .body(|body| {
-                body.rows(text_h, rows.len(), |mut row| {
-                    let list = if show_trash {
-                        &self.data.trashed
-                    } else {
-                        &self.data.roms
-                    };
-                    let r = &list[rows[row.index()]];
-                    row.set_selected(self.view.selected == Some(r.id));
-                    row.col(|ui| {
-                        ui.label(r.display_name()).on_hover_text(r.file_name());
-                    });
-                    row.col(|ui| {
-                        ui.label(systems::get(&r.system).map(|s| s.name).unwrap_or(&r.system));
-                    });
-                    row.col(|ui| {
-                        if show_trash {
-                            ui.label(r.status_reason.clone().unwrap_or_default());
-                        } else {
-                            ui.label(r.regions.join(", "));
-                        }
-                    });
-                    row.col(|ui| {
-                        ui.label(human_size(r.total_size));
-                    });
-                    row.col(|ui| {
-                        if self.data.with_art.contains(&r.id) {
-                            ui.label("✔");
-                        }
-                    });
-                    if row.response().clicked() {
-                        clicked = Some(r.id);
-                    }
-                });
-            });
-        if let Some(id) = clicked {
-            self.view.selected = if self.view.selected == Some(id) {
-                None
-            } else {
-                Some(id)
-            };
-        }
-    }
-
-    fn rom_detail(&mut self, ui: &mut Ui, rom: &Rom) {
-        ui.add_space(6.0);
-        ui.horizontal(|ui| {
-            ui.label(RichText::new(&rom.title).strong().size(17.0));
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
-                if ui.small_button("×").clicked() {
-                    self.view.selected = None;
-                }
-            });
-        });
-        if let Some(lib) = &self.lib {
-            if let Ok(media) = lib.media(rom.id) {
-                for kind in ["boxart", "mix", "snap", "title"] {
-                    if let Some(p) = media.get(kind) {
-                        ui.add(
-                            egui::Image::new(format!("file://{}", p.display()))
-                                .max_width(ui.available_width().min(280.0))
-                                .max_height(320.0)
-                                .corner_radius(4.0),
-                        );
-                        break;
-                    }
-                }
-            }
-        }
-        egui::Grid::new("detail")
-            .num_columns(2)
-            .spacing([10.0, 4.0])
-            .show(ui, |ui| {
-                let mut kv = |k: &str, v: String| {
-                    ui.label(RichText::new(k).weak());
-                    ui.label(v);
-                    ui.end_row();
-                };
-                kv("System", systems::name_of(&rom.system).to_string());
-                kv("File", rom.file_name().to_string());
-                if rom.files.len() > 1 {
-                    kv("Also", format!("{} more file(s)", rom.files.len() - 1));
-                }
-                kv(
-                    "Regions",
-                    if rom.regions.is_empty() {
-                        "—".into()
-                    } else {
-                        rom.regions.join(", ")
-                    },
-                );
-                if !rom.languages.is_empty() {
-                    kv("Languages", rom.languages.join(", "));
-                }
-                if rom.revision.iter().any(|v| *v > 0) {
-                    kv(
-                        "Revision",
-                        rom.revision
-                            .iter()
-                            .map(|v| v.to_string())
-                            .collect::<Vec<_>>()
-                            .join("."),
-                    );
-                }
-                if let Some(d) = rom.disc {
-                    kv("Disc", d.to_string());
-                }
-                if !rom.flags.is_empty() {
-                    kv(
-                        "Flags",
-                        rom.flags.iter().cloned().collect::<Vec<_>>().join(", "),
-                    );
-                }
-                kv("Size", human_size(rom.total_size));
-                if let Some(c) = &rom.crc {
-                    kv("CRC32", c.to_uppercase());
-                }
-                if let Some(r) = &rom.status_reason {
-                    kv("Removed", r.clone());
-                }
-            });
-        if rom.system == "scummvm" && rom.status == "active" {
-            self.scummvm_id_editor(ui, rom);
-        }
-        ui.add_space(8.0);
-        ui.horizontal_wrapped(|ui| {
-            if let Some(lib) = &self.lib {
-                let path = lib.abspath(&rom.path);
-                if ui.button("Show in folder").clicked() {
-                    let _ = open::that(path.parent().unwrap_or(&path));
-                }
-            }
-            if rom.status == "active" {
-                if ui.button("Move to trash").clicked() {
-                    self.trash_now(rom.clone(), "removed by hand");
-                }
-            } else if ui.button("Restore").clicked() {
-                self.restore_roms(vec![rom.clone()]);
-            }
-        });
-    }
-
     /// Show / set the ScummVM game ID (written as `<Game>.scummvm` in the folder).
-    fn scummvm_id_editor(&mut self, ui: &mut Ui, rom: &Rom) {
+    pub(crate) fn scummvm_id_editor(&mut self, ui: &mut Ui, rom: &Rom) {
         let Some(lib) = &self.lib else { return };
         let dir = lib.abspath(&rom.path);
         if !dir.is_dir() {
@@ -775,11 +491,11 @@ impl RomApp {
         ui.data_mut(|d| d.insert_temp(key, text));
     }
 
-    fn trash_now(&mut self, rom: Rom, reason: &str) {
+    pub(crate) fn trash_now(&mut self, rom: Rom, reason: &str) {
         if let Some(lib) = &self.lib {
             match lib.trash(&rom, reason) {
                 Ok(()) => {
-                    self.view.selected = None;
+                    self.view.selected.clear();
                     self.reload();
                     self.notify(format!("Moved {} to the trash.", rom.stem));
                 }
@@ -788,7 +504,7 @@ impl RomApp {
         }
     }
 
-    fn restore_roms(&mut self, roms: Vec<Rom>) {
+    pub(crate) fn restore_roms(&mut self, roms: Vec<Rom>) {
         let Some(lib) = &self.lib else { return };
         let mut errors = vec![];
         let mut n = 0;
