@@ -512,7 +512,13 @@ impl RomApp {
                 .iter()
                 .enumerate()
                 .filter(|(_, r)| key.0.as_ref().is_none_or(|s| &r.system == s))
-                .filter(|(_, r)| key.1.is_empty() || r.stem.to_lowercase().contains(&key.1))
+                .filter(|(_, r)| {
+                    key.1.is_empty()
+                        || r.stem.to_lowercase().contains(&key.1)
+                        || r.alt_name
+                            .as_ref()
+                            .is_some_and(|a| a.to_lowercase().contains(&key.1))
+                })
                 .map(|(i, _)| i)
                 .collect();
             self.view.filter_key = Some(key);
@@ -569,7 +575,7 @@ impl RomApp {
                     let r = &list[rows[row.index()]];
                     row.set_selected(self.view.selected == Some(r.id));
                     row.col(|ui| {
-                        ui.label(&r.stem).on_hover_text(&r.stem);
+                        ui.label(r.display_name()).on_hover_text(r.file_name());
                     });
                     row.col(|ui| {
                         ui.label(systems::get(&r.system).map(|s| s.name).unwrap_or(&r.system));
@@ -680,6 +686,9 @@ impl RomApp {
                     kv("Removed", r.clone());
                 }
             });
+        if rom.system == "scummvm" && rom.status == "active" {
+            self.scummvm_id_editor(ui, rom);
+        }
         ui.add_space(8.0);
         ui.horizontal_wrapped(|ui| {
             if let Some(lib) = &self.lib {
@@ -696,6 +705,58 @@ impl RomApp {
                 self.restore_roms(vec![rom.clone()]);
             }
         });
+    }
+
+    /// Show / set the ScummVM game ID (written as `<Game>.scummvm` in the folder).
+    fn scummvm_id_editor(&mut self, ui: &mut Ui, rom: &Rom) {
+        let Some(lib) = &self.lib else { return };
+        let dir = lib.abspath(&rom.path);
+        if !dir.is_dir() {
+            return;
+        }
+        let current = rom_manager_core::folder_games::scummvm_id(&dir);
+        let key = egui::Id::unique(("scummvm-id", rom.id));
+        let mut text: String = ui
+            .data_mut(|d| d.get_temp(key))
+            .unwrap_or_else(|| current.clone().unwrap_or_default());
+        ui.add_space(8.0);
+        ui.label(RichText::new("ScummVM game ID").strong());
+        if current.is_none() {
+            ui.colored_label(
+                widgets::warn_color(ui),
+                "Not identified yet: firmware won't know how to launch this game.",
+            );
+        }
+        let mut save = false;
+        ui.horizontal(|ui| {
+            let resp = ui.add(
+                egui::TextEdit::singleline(&mut text)
+                    .hint_text("e.g. monkey2")
+                    .desired_width(140.0),
+            );
+            save = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+            save |= ui
+                .add_enabled(!text.trim().is_empty(), egui::Button::new("Save"))
+                .clicked();
+        });
+        ui.label(
+            RichText::new(
+                "Find IDs at scummvm.org/compatibility (the short name, like 'monkey2').",
+            )
+            .weak()
+            .small(),
+        );
+        if save && !text.trim().is_empty() {
+            let id = text.trim().to_string();
+            match rom_manager_core::folder_games::write_scummvm_id(&dir, &rom.stem, &id) {
+                Ok(()) => {
+                    self.notice =
+                        Some((format!("Saved ScummVM ID '{id}' for {}.", rom.stem), false))
+                }
+                Err(e) => self.notice = Some((e.to_string(), true)),
+            }
+        }
+        ui.data_mut(|d| d.insert_temp(key, text));
     }
 
     fn trash_now(&mut self, rom: Rom, reason: &str) {

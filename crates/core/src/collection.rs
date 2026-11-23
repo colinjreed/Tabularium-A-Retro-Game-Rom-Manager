@@ -312,6 +312,17 @@ impl Writer<'_> {
         fs::rename(&tmp, &dst)
     }
 
+    fn copy_dir(&mut self, src: &Path, rel: &str) -> std::io::Result<()> {
+        for e in walkdir::WalkDir::new(src).into_iter().flatten() {
+            if e.file_type().is_file() {
+                let sub = e.path().strip_prefix(src).unwrap_or(e.path());
+                let sub = sub.to_string_lossy().replace('\\', "/");
+                self.copy(e.path(), &format!("{rel}/{sub}"))?;
+            }
+        }
+        Ok(())
+    }
+
     fn write(&mut self, rel: &str, data: &[u8]) -> std::io::Result<()> {
         self.written.insert(rel.to_string());
         let dst = self.dest.join(rel);
@@ -324,6 +335,16 @@ impl Writer<'_> {
         }
         fs::create_dir_all(dst.parent().unwrap())?;
         fs::write(dst, data)
+    }
+}
+
+/// Folder name for a DOS / ScummVM game on the card. ScummVM folders end in
+/// `.scummvm` (Batocera, ES-DE, ROCKNIX, muOS); Batocera's DOS folders end in `.pc`.
+fn folder_game_name(profile: &Profile, system: &str, stem: &str, dir: &Path) -> String {
+    match (system, profile.id) {
+        ("scummvm", _) => format!("{stem}.scummvm"),
+        ("dos", "batocera") => format!("{stem}.pc"),
+        _ => file_name(dir),
     }
 }
 
@@ -442,7 +463,19 @@ pub fn export(
             continue;
         }
         for r in unit {
+            let mut main_name = r.file_name().to_string();
             for f in lib.abspaths(r) {
+                if f.is_dir() {
+                    main_name = folder_game_name(profile, sys.id, &r.stem, &f);
+                    if sys.id == "scummvm" && crate::folder_games::scummvm_id(&f).is_none() {
+                        warnings.insert(format!(
+                            "ScummVM game '{}' has no game ID file, so it may not launch",
+                            r.stem
+                        ));
+                    }
+                    w.copy_dir(&f, &format!("{sys_dir}/{main_name}"))?;
+                    continue;
+                }
                 let name = file_name(&f);
                 if name.contains(FAT_BAD) {
                     warnings.insert(format!("'{name}' has characters FAT/exFAT cards reject"));
@@ -457,13 +490,13 @@ pub fn export(
                 }
                 w.copy(&f, &format!("{sys_dir}/{name}"))?;
             }
-            let main_rel = format!("{sys_dir}/{}", r.file_name());
+            let main_rel = format!("{sys_dir}/{main_name}");
             let image = place_art(&mut w, r, sys, &main_rel)?;
             gamelists
                 .entry(sys_dir.clone())
                 .or_default()
                 .push(GamelistEntry {
-                    path: format!("./{}", r.file_name()),
+                    path: format!("./{main_name}"),
                     name: r.title.clone(),
                     image: image.map(|i| rel_from(&sys_dir, &i)),
                 });

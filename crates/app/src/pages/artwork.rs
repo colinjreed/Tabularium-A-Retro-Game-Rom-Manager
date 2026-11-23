@@ -192,6 +192,10 @@ impl RomApp {
                     scrapers.push(Box::new(lr));
                 }
             }
+            // Arcade art is matched by full name, so make sure names are known.
+            if let Err(e) = rom_manager_core::metadata::enrich(&lib, &default_fetcher(), rep) {
+                rep.log(e.to_string());
+            }
             match scrape_library(&lib, &mut scrapers, &kinds, &systems, refresh, rep) {
                 Ok(r) => JobOutput::Scrape(r),
                 Err(e) => JobOutput::Error(e.to_string()),

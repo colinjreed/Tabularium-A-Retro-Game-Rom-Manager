@@ -8,8 +8,10 @@ use crate::Result;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct ImportOptions {
+    /// Network access for arcade / ScummVM name lists (None = offline).
+    pub fetch: Option<crate::http::Fetcher>,
     pub move_files: bool,
     pub dry_run: bool,
     /// Treat every file as this system.
@@ -43,7 +45,8 @@ pub fn import(
 ) -> Result<ImportReport> {
     let mut out = ImportReport::default();
     rep.progress(0, 0, "Scanning folders…");
-    let found = scan(sources, opts.forced_system, &|| rep.cancelled());
+    let mut found = scan(sources, opts.forced_system, &|| rep.cancelled());
+    recognise_arcade_zips(lib, &mut found.sets, opts, rep);
     out.ignored = found.skipped.len();
     let total = found.sets.len();
     lib.begin()?;
@@ -86,6 +89,42 @@ pub fn import(
         }
     }
     lib.commit()?;
+    if let (Some(fetch), false) = (&opts.fetch, opts.dry_run) {
+        crate::metadata::enrich(lib, fetch, rep)?;
+    }
     rep.progress(total, total, "Done");
     Ok(out)
+}
+
+/// Zips nothing else could place: if the file name is a known MAME/FBNeo
+/// set, it's arcade. The folder name picks MAME / CPS1-3, else FBNeo.
+fn recognise_arcade_zips(
+    lib: &Library,
+    sets: &mut [RomSet],
+    opts: &ImportOptions,
+    rep: &dyn Reporter,
+) {
+    let unknown_zip = |rs: &RomSet| rs.system.is_none() && crate::detect::ext_of(&rs.main) == "zip";
+    if !sets.iter().any(unknown_zip) {
+        return;
+    }
+    let Some(fetch) = &opts.fetch else { return };
+    rep.progress(0, 0, "Checking the arcade game list…");
+    let Some(names) = crate::metadata::arcade_names(&crate::metadata::cache_dir(lib), fetch) else {
+        return;
+    };
+    for rs in sets.iter_mut().filter(|rs| unknown_zip(rs)) {
+        let stem = rs
+            .main
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_lowercase();
+        if names.contains_key(&stem) {
+            let hint = crate::detect::folder_hint(&rs.main, None)
+                .filter(|s| crate::systems::is_arcade(s.id));
+            rs.system = hint.or(crate::systems::get("arcade"));
+            rs.reason = "arcade game list".into();
+        }
+    }
 }

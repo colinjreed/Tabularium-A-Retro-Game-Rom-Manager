@@ -245,27 +245,41 @@ impl Scraper for LibretroScraper {
         system: &System,
         kind: &str,
     ) -> Result<Option<Vec<u8>>, ScrapeError> {
-        let (Some(dir), Some(playlist)) = (kind_dir(kind), system.libretro) else {
+        let (Some(dir), Some(primary)) = (kind_dir(kind), system.libretro) else {
             return Ok(None);
         };
-        let guesses: Vec<String> = match self.index(playlist, dir) {
-            Some(names) => best_match(&rom.stem, &names, self.cutoff)
-                .into_iter()
-                .collect(),
-            None => {
-                let mut g = vec![naming::libretro_safe(&rom.stem)];
-                let nd = naming::libretro_safe(&naming::strip_disc(&rom.stem));
-                if nd != g[0] {
-                    g.push(nd);
+        // Arcade thumbnails are named by full name; try both arcade sets.
+        let name = rom.display_name().to_string();
+        let mut playlists = vec![primary];
+        if crate::systems::is_arcade(system.id) {
+            for alt in ["MAME", "FBNeo - Arcade Games"] {
+                if alt != primary {
+                    playlists.push(alt);
                 }
-                g
             }
-        };
-        for g in guesses {
-            match self.download(playlist, dir, &g) {
-                Ok(Some(d)) => return Ok(Some(d)),
-                Ok(None) => {}
-                Err(e) => return Err(ScrapeError::Skip(e.to_string())),
+        }
+        for playlist in playlists {
+            let guesses: Vec<String> = match self.index(playlist, dir) {
+                Some(names) => best_match(&name, &names, self.cutoff).into_iter().collect(),
+                None => {
+                    let mut g = vec![naming::libretro_safe(&name)];
+                    let nd = naming::libretro_safe(&naming::strip_disc(&name));
+                    if nd != g[0] {
+                        g.push(nd);
+                    }
+                    // "Title: Subtitle" is usually "Title - Subtitle" in thumbnail names.
+                    if name.contains(": ") {
+                        g.push(naming::libretro_safe(&name.replace(": ", " - ")));
+                    }
+                    g
+                }
+            };
+            for g in guesses {
+                match self.download(playlist, dir, &g) {
+                    Ok(Some(d)) => return Ok(Some(d)),
+                    Ok(None) => {}
+                    Err(e) => return Err(ScrapeError::Skip(e.to_string())),
+                }
             }
         }
         Ok(None)

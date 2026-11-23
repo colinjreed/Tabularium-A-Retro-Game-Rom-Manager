@@ -53,7 +53,18 @@ fn status_list(ui: &mut Ui, _id: &str, statuses: &[ReqStatus]) {
             ui.label(RichText::new(format!("({kind}{any})")).weak());
         });
         ui.indent(("bios", rs.req.system), |ui| {
-            for f in &rs.files {
+            let long = rs.files.len() > 6;
+            if long && !rs.files.iter().any(|f| f.state != FileState::Missing) {
+                ui.colored_label(
+                    ui.visuals().weak_text_color(),
+                    format!("· none of the {} known BIOS dumps found", rs.files.len()),
+                );
+            }
+            for f in rs
+                .files
+                .iter()
+                .filter(|f| !long || f.state != FileState::Missing)
+            {
                 let (mark, text) = match &f.state {
                     FileState::Ok => ("✔", f.file.name.to_string()),
                     FileState::Missing => ("·", format!("{} — missing", f.file.name)),

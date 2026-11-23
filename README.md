@@ -73,13 +73,68 @@ your messy folders ──Import──▶ LIBRARY (sorted by system, indexed)
 | NextUI / MinUI | TrimUI Brick / Smart Pro, Miyoo | `Roms/Game Boy (GB)/` | `Roms/…/.media/` (300px) | `Bios/GB/` |
 | ES-DE | Retroid Pocket, AYN Odin, Ayaneo, Steam Deck | `ROMs/gb/` | `ES-DE/downloaded_media/gb/covers/` | `RetroArch/system/` |
 
+PS2, GameCube, 3DS and Xbox need powerful hardware (Retroid / Odin-class
+Android devices, or a PC running Batocera or ES-DE). Low-power handhelds
+like the Miyoo Mini can't run them, but their folder names are still defined.
+
+BIOS checks include every PS2 BIOS dump known to libretro (by hash), the
+Xbox files xemu needs (`mcpx_1.0.bin`, `Complex_4627.bin`,
+`xbox_hdd.qcow2`, by name), and the optional GameCube IPL and DOS MT-32 ROMs.
+
 Firmware updates sometimes rename folders. Every system's folder name can be
 overridden per SD card under *Artwork and extras → Folder names on the card*.
 
-34 systems are supported, including NES, SNES, Game Boy/Color/Advance,
-N64, DS, Genesis, Master System, Game Gear, Sega CD, 32X, Saturn,
-Dreamcast, PlayStation, PSP, PC Engine (and CD), Atari 2600/7800/Lynx, Neo
-Geo Pocket, WonderSwan, ColecoVision, MSX, Vectrex, PICO-8 and arcade.
+44 systems are supported: NES, Famicom Disk System, SNES, Game Boy / Color /
+Advance, N64, DS, 3DS, GameCube, Virtual Boy, Pokémon Mini, Genesis, 32X,
+Master System, Game Gear, SG-1000, Sega CD, Saturn, Dreamcast, PlayStation
+1 and 2, PSP, Xbox, PC Engine (and CD), Atari 2600 / 7800 / Lynx, Neo Geo
+Pocket (Color), WonderSwan (Color), ColecoVision, MSX, Vectrex, PICO-8, DOS,
+ScummVM, and arcade (FBNeo, MAME, CPS-1, CPS-2, CPS-3).
+
+### Disc systems: PS1 vs PS2, GameCube, Xbox
+
+Disc images are identified from their contents, so a PS2 `.iso` sitting in a
+"PS1" folder still lands in PS2. PS1 and PS2 discs are told apart by the
+`SYSTEM.CNF` file on the disc. GameCube discs are recognised from the disc
+header, including inside Dolphin's `.rvz` / `.gcz` formats (Wii discs are
+skipped). Xbox discs are recognised as XISO images, the format xemu needs.
+
+### Arcade (FBNeo, MAME, CPS-1/2/3)
+
+Arcade games are zips named by short name (`sf2.zip`). The app downloads
+libretro's FBNeo and MAME name lists once (about 18,000 games), then:
+
+* zips that aren't recognised any other way are identified as arcade games;
+* they show their full names, e.g. "Street Fighter II: The World Warrior
+  (World 910522)", and artwork is matched by that name;
+* one-game-one-ROM works for arcade too, keeping e.g. the World version
+  over Japanese and bootleg sets.
+
+Which arcade system a game goes to comes from its folder name (`mame`,
+`cps1`, `cps2`, `cps3`, `fbneo`…), defaulting to FBNeo. Keep each
+system's romset matched to the emulator version on your device.
+
+### DOS and ScummVM (folder games)
+
+DOS and ScummVM games are usually folders of files, and the app treats each
+folder as one game. A folder counts as a game when it ends in `.scummvm`,
+`.svm`, `.pc` or `.dos`, contains a ScummVM `.scummvm` file, or sits directly
+inside a folder named `DOS` or `ScummVM`. Zipped DOS games (`.zip`,
+`.dosz`) work too.
+
+ScummVM needs each game's **game ID** (e.g. `monkey2`). The app works it out
+and writes it into a `<Game>.scummvm` file inside the folder. It uses, in
+order:
+
+1. an existing `.scummvm` file;
+2. well-known data files (e.g. `MONKEY2.000` means `monkey2`);
+3. a folder already named after the ID;
+4. the title, matched against libretro's list of 11,000+ ScummVM games.
+
+Anything still unidentified can be set by hand in the library's detail panel.
+On the SD card each game becomes `<Game>.scummvm/` with the ID file inside,
+the layout Batocera, ES-DE and ROCKNIX expect. Batocera's DOS folders get
+the `.pc` suffix it needs.
 
 ## Artwork sources
 

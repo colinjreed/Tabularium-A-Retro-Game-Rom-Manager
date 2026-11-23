@@ -370,3 +370,65 @@ mod tests {
         assert_eq!(strip_disc("FF7 (USA) (Disc 1)"), "FF7 (USA)");
     }
 }
+
+/// Parse a MAME / FBNeo full name such as
+/// "Street Fighter II': Champion Edition (Japan 920513)" or
+/// "Final Fight (US, rev 1)". Regions and flags hide inside free-form tags.
+pub fn parse_arcade(name: &str) -> ParsedName {
+    let mut p = parse(name);
+    for tag in p.tags.clone() {
+        if tag.starts_with('[') {
+            continue;
+        }
+        for part in tag.split(',') {
+            let part = part.trim().to_lowercase();
+            let first = part.split_whitespace().next().unwrap_or("");
+            let first = match first {
+                "us" | "usa" => "usa",
+                "euro" | "europe" => "europe",
+                other => other,
+            };
+            if let Some(r) = region(first).filter(|_| first.len() > 1) {
+                if !p.regions.iter().any(|x| x == r) {
+                    p.regions.push(r.to_string());
+                }
+            }
+            if part.contains("bootleg") {
+                p.flags.insert("pirate".into());
+            }
+            if part.contains("prototype") || part.contains("location test") {
+                p.flags.insert("proto".into());
+            }
+            if part.split_whitespace().any(|w| w == "hack") {
+                p.flags.insert("hack".into());
+            }
+            if part.contains("demo") {
+                p.flags.insert("demo".into());
+            }
+            if let Some(rest) = part.strip_prefix("rev ") {
+                p.revision = rev_tuple(rest.trim());
+            }
+        }
+    }
+    p
+}
+
+#[cfg(test)]
+mod arcade_tests {
+    use super::*;
+
+    #[test]
+    fn arcade_names() {
+        let p = parse_arcade("Street Fighter II': Champion Edition (Japan 920513)");
+        assert_eq!(p.title, "Street Fighter II': Champion Edition");
+        assert_eq!(p.regions, vec!["Japan"]);
+        let w = parse_arcade("Street Fighter II': Champion Edition (World 920513)");
+        assert_eq!(p.key, w.key);
+        assert!(parse_arcade("Final Fight (bootleg)")
+            .flags
+            .contains("pirate"));
+        let f = parse_arcade("Final Fight (US, rev 1)");
+        assert_eq!(f.regions, vec!["USA"]);
+        assert_eq!(f.revision, vec![1]);
+    }
+}

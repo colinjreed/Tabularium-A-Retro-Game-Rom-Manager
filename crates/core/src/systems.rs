@@ -9,8 +9,8 @@ use std::sync::OnceLock;
 /// Extensions used by more than one system. Files with these need folder
 /// hints, archive inspection or header sniffing to place.
 pub const AMBIGUOUS_EXTS: &[&str] = &[
-    "bin", "iso", "img", "cue", "chd", "zip", "7z", "rom", "m3u", "ccd", "mdf", "toc", "cdi",
-    "gdi", "pbp", "cso", "rvz",
+    "gz", "zso", "bin", "iso", "img", "cue", "chd", "zip", "7z", "rom", "m3u", "ccd", "mdf", "toc",
+    "cdi", "gdi", "pbp", "cso", "rvz",
 ];
 
 const CD: &[&str] = &[
@@ -576,28 +576,175 @@ pub static SYSTEMS: &[System] = &[
         false
     ),
     sys!(
+        "ps2",
+        "Sony PlayStation 2",
+        Some("Sony - PlayStation 2"),
+        &[],
+        &["iso", "chd", "cso", "zso", "gz", "bin", "cue", "m3u"],
+        &["playstation2", "ps2", "sonyplaystation2"],
+        "ps2",
+        "ps2",
+        "PS2",
+        "Sony PlayStation 2 (PS2)",
+        "Sony PlayStation 2",
+        Some(58),
+        true
+    ),
+    sys!(
+        "gamecube",
+        "Nintendo GameCube",
+        Some("Nintendo - GameCube"),
+        &["gcm", "gcz"],
+        &["iso", "rvz", "ciso", "m3u"],
+        &["gamecube", "gc", "ngc", "nintendogamecube"],
+        "gc",
+        "gamecube",
+        "GC",
+        "Nintendo GameCube (GC)",
+        "Nintendo GameCube",
+        Some(13),
+        true
+    ),
+    sys!(
+        "n3ds",
+        "Nintendo 3DS",
+        Some("Nintendo - Nintendo 3DS"),
+        &["3ds", "cia", "cci", "cxi", "3dsx"],
+        ZIP,
+        &["3ds", "n3ds", "nintendo3ds"],
+        "n3ds",
+        "3ds",
+        "3DS",
+        "Nintendo 3DS (3DS)",
+        "Nintendo 3DS",
+        Some(17),
+        false
+    ),
+    sys!(
+        "xbox",
+        "Microsoft Xbox",
+        Some("Microsoft - Xbox"),
+        &["xiso"],
+        &["iso"],
+        &["xbox", "microsoftxbox", "xemu"],
+        "xbox",
+        "xbox",
+        "XBOX",
+        "Microsoft Xbox (XBOX)",
+        "Microsoft Xbox",
+        Some(32),
+        true
+    ),
+    sys!(
+        "dos",
+        "DOS",
+        Some("DOS"),
+        &["dosz"],
+        &["zip", "7z"],
+        &["dos", "msdos", "pc", "dosbox", "exodos", "ibmpc"],
+        "dos",
+        "dos",
+        "DOS",
+        "DOS (DOS)",
+        "DOS",
+        Some(135),
+        false
+    ),
+    sys!(
+        "scummvm",
+        "ScummVM",
+        Some("ScummVM"),
+        &["scummvm", "svm"],
+        &[],
+        &["scummvm", "scumm", "svm"],
+        "scummvm",
+        "scummvm",
+        "SCUMMVM",
+        "ScummVM (SCUMMVM)",
+        "ScummVM",
+        Some(123),
+        false
+    ),
+    sys!(
         "arcade",
-        "Arcade (MAME / FBNeo)",
-        None,
+        "Arcade (FBNeo)",
+        Some("FBNeo - Arcade Games"),
         &[],
         ZIP,
         &[
             "arcade",
-            "mame",
             "fbneo",
             "fba",
             "finalburn",
-            "cps1",
-            "cps2",
-            "cps3",
+            "finalburnneo",
             "neogeo"
         ],
         "arcade",
-        "mame",
+        "fbneo",
         "ARCADE",
         "Arcade (FBN)",
         "Arcade",
         Some(75),
+        false
+    ),
+    sys!(
+        "mame",
+        "Arcade (MAME)",
+        Some("MAME"),
+        &[],
+        ZIP,
+        &["mame", "mame2003", "mame2003plus", "mame2010", "mame2000"],
+        "mame",
+        "mame",
+        "MAME",
+        "MAME (MAME)",
+        "Arcade",
+        Some(75),
+        false
+    ),
+    sys!(
+        "cps1",
+        "Capcom CPS-1",
+        Some("FBNeo - Arcade Games"),
+        &[],
+        ZIP,
+        &["cps1", "cps"],
+        "cps1",
+        "cps1",
+        "CPS1",
+        "Capcom Play System (CPS1)",
+        "Capcom Play System",
+        Some(6),
+        false
+    ),
+    sys!(
+        "cps2",
+        "Capcom CPS-2",
+        Some("FBNeo - Arcade Games"),
+        &[],
+        ZIP,
+        &["cps2"],
+        "cps2",
+        "cps2",
+        "CPS2",
+        "Capcom Play System II (CPS2)",
+        "Capcom Play System 2",
+        Some(7),
+        false
+    ),
+    sys!(
+        "cps3",
+        "Capcom CPS-3",
+        Some("FBNeo - Arcade Games"),
+        &[],
+        ZIP,
+        &["cps3"],
+        "cps3",
+        "cps3",
+        "CPS3",
+        "Capcom Play System III (CPS3)",
+        "Capcom Play System 3",
+        Some(8),
         false
     ),
 ];
@@ -674,6 +821,16 @@ pub fn from_folder_name(name: &str) -> Option<&'static System> {
         }
     }
     None
+}
+
+/// Systems whose games are arcade romsets (zips named by MAME short name).
+pub fn is_arcade(id: &str) -> bool {
+    matches!(id, "arcade" | "mame" | "cps1" | "cps2" | "cps3")
+}
+
+/// Systems whose games can be whole folders rather than single files.
+pub fn folder_games(id: &str) -> bool {
+    matches!(id, "dos" | "scummvm")
 }
 
 #[cfg(test)]

@@ -134,6 +134,7 @@ impl RomApp {
             return;
         };
         let opts = ImportOptions {
+            fetch: Some(rom_manager_core::http::default_fetcher()),
             move_files: self.import.move_files,
             dry_run,
             forced_system: self.import.forced.and_then(systems::get),

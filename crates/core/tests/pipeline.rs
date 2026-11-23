@@ -462,6 +462,7 @@ fn screenscraper_queries_once_per_rom() {
         total_size: 32768,
         status: "active".into(),
         status_reason: None,
+        alt_name: None,
     };
     let gb = systems::get("gb").unwrap();
     assert_eq!(

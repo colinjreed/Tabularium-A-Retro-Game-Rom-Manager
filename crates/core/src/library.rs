@@ -78,6 +78,8 @@ pub struct Rom {
     pub total_size: u64,
     pub status: String,
     pub status_reason: Option<String>,
+    /// Full name for arcade sets ("Street Fighter II …" for sf2.zip).
+    pub alt_name: Option<String>,
 }
 
 impl Rom {
@@ -103,7 +105,13 @@ impl Rom {
             total_size: r.get::<_, i64>("total_size")? as u64,
             status: r.get("status")?,
             status_reason: r.get("status_reason")?,
+            alt_name: r.get("alt_name").unwrap_or(None),
         })
+    }
+
+    /// What to show people: the arcade full name, else the file name.
+    pub fn display_name(&self) -> &str {
+        self.alt_name.as_deref().unwrap_or(&self.stem)
     }
 
     pub fn file_name(&self) -> &str {
@@ -144,13 +152,73 @@ fn rel(root: &Path, p: &Path) -> String {
         .replace('\\', "/")
 }
 
+/// Split a ROM path into (stem, ".ext"). Game folders only lose a known
+/// suffix, so "Mr. Bones" stays whole.
+pub fn split_name(p: &Path) -> (String, String) {
+    let name = p
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+    if p.is_dir() {
+        for suf in [".scummvm", ".svm", ".pc", ".dos"] {
+            if name.to_ascii_lowercase().ends_with(suf) && name.len() > suf.len() {
+                let cut = name.len() - suf.len();
+                return (name[..cut].to_string(), name[cut..].to_string());
+            }
+        }
+        return (name, String::new());
+    }
+    match name.rfind('.') {
+        Some(i) if i > 0 => (name[..i].to_string(), name[i..].to_string()),
+        _ => (name, String::new()),
+    }
+}
+
+/// Copy a file, or a whole folder (DOS / ScummVM games).
+pub fn copy_path(src: &Path, dst: &Path) -> std::io::Result<()> {
+    if src.is_dir() {
+        fs::create_dir_all(dst)?;
+        for e in fs::read_dir(src)? {
+            let e = e?;
+            copy_path(&e.path(), &dst.join(e.file_name()))?;
+        }
+        Ok(())
+    } else {
+        fs::copy(src, dst).map(|_| ())
+    }
+}
+
 fn move_file(src: &Path, dst: &Path) -> std::io::Result<()> {
     if fs::rename(src, dst).is_err() {
         // Different drive: copy then delete.
-        fs::copy(src, dst)?;
-        fs::remove_file(src)?;
+        copy_path(src, dst)?;
+        remove_path(src)?;
     }
     Ok(())
+}
+
+pub fn remove_path(p: &Path) -> std::io::Result<()> {
+    if p.is_dir() {
+        fs::remove_dir_all(p)
+    } else {
+        fs::remove_file(p)
+    }
+}
+
+/// Size of a file, or of everything in a folder.
+pub fn path_size(p: &Path) -> u64 {
+    if p.is_dir() {
+        walkdir::WalkDir::new(p)
+            .into_iter()
+            .flatten()
+            .filter(|e| e.file_type().is_file())
+            .filter_map(|e| e.metadata().ok())
+            .map(|m| m.len())
+            .sum()
+    } else {
+        fs::metadata(p).map(|m| m.len()).unwrap_or(0)
+    }
 }
 
 impl Library {
@@ -166,6 +234,13 @@ impl Library {
         let db = Connection::open(root.join("library.db"))?;
         db.execute_batch("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;")?;
         db.execute_batch(SCHEMA)?;
+        // Added in 0.3: full names for arcade sets (from the MAME/FBNeo lists).
+        let has_alt: bool = db
+            .prepare("SELECT 1 FROM pragma_table_info('roms') WHERE name = 'alt_name'")?
+            .exists([])?;
+        if !has_alt {
+            db.execute_batch("ALTER TABLE roms ADD COLUMN alt_name TEXT")?;
+        }
         for d in SUBDIRS {
             let _ = fs::create_dir_all(root.join(d));
         }
@@ -196,7 +271,7 @@ impl Library {
                 .collect();
             sql += &format!(" AND system IN ({})", list.join(","));
         }
-        sql += " ORDER BY system, stem COLLATE NOCASE";
+        sql += " ORDER BY system, COALESCE(alt_name, stem) COLLATE NOCASE";
         let mut st = self.db.prepare(&sql)?;
         let rows = st.query_map([status], Rom::from_row)?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
@@ -347,12 +422,7 @@ impl Library {
                     name.to_string_lossy()
                 )));
             }
-            let stem = rs.main.file_stem().unwrap_or_default().to_string_lossy();
-            let ext = rs
-                .main
-                .extension()
-                .map(|e| format!(".{}", e.to_string_lossy()))
-                .unwrap_or_default();
+            let (stem, ext) = split_name(&rs.main);
             let mut n = 2;
             while dest_dir.join(format!("{stem} ({n}){ext}")).exists() {
                 n += 1;
@@ -381,21 +451,16 @@ impl Library {
             if move_files {
                 move_file(src, dst)?;
             } else {
-                fs::copy(src, dst)?;
+                copy_path(src, dst)?;
             }
         }
-        let stem = main_dest
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
+        let stem = split_name(&main_dest).0;
+        if sys.id == "scummvm" && main_dest.is_dir() {
+            crate::folder_games::ensure_scummvm_id(&main_dest, &stem, Some(&rs.main));
+        }
         let p = naming::parse(&stem);
         let files: Vec<String> = dests.iter().map(|d| rel(&self.root, d)).collect();
-        let total: u64 = dests
-            .iter()
-            .filter_map(|d| fs::metadata(d).ok())
-            .map(|m| m.len())
-            .sum();
+        let total: u64 = dests.iter().map(|d| path_size(d)).sum();
         let flags: Vec<&String> = p.flags.iter().collect();
         self.db.execute(
             "INSERT INTO roms (system, path, files, stem, title, key, regions, languages, revision, disc, \
@@ -433,7 +498,7 @@ impl Library {
                 if move_files {
                     move_file(&src, &d)?
                 } else {
-                    fs::copy(&src, &d).map(|_| ())?
+                    copy_path(&src, &d)?
                 }
             }
         }
@@ -493,11 +558,31 @@ impl Library {
         let trashed = self.roms(&[], "trashed")?;
         for r in &trashed {
             for f in &r.files {
-                let _ = fs::remove_file(self.root.join(f));
+                let _ = remove_path(&self.root.join(f));
             }
             self.db.execute("DELETE FROM roms WHERE id = ?1", [r.id])?;
         }
         Ok(trashed.len())
+    }
+
+    /// Record an arcade set's full name and re-derive its title, region and flags.
+    pub fn set_alt_name(&self, rom_id: i64, full_name: &str) -> Result<()> {
+        let mut p = naming::parse_arcade(full_name);
+        p.flags.remove("bios"); // arcade BIOS sets (neogeo.zip) must stay with the games
+        let flags: Vec<&String> = p.flags.iter().collect();
+        self.db.execute(
+            "UPDATE roms SET alt_name=?1, title=?2, key=?3, regions=?4, revision=?5, flags=?6 WHERE id=?7",
+            params![
+                full_name,
+                p.title,
+                p.key,
+                serde_json::to_string(&p.regions).unwrap(),
+                serde_json::to_string(&p.revision).unwrap(),
+                serde_json::to_string(&flags).unwrap(),
+                rom_id
+            ],
+        )?;
+        Ok(())
     }
 
     pub fn begin(&self) -> Result<()> {

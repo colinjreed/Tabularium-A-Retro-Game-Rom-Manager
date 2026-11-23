@@ -35,6 +35,302 @@ macro_rules! f {
     ($n:expr, $($m:expr),+) => { BiosFile { name: $n, md5: &[$($m),+] } };
 }
 
+// PlayStation 2 BIOS dumps known to libretro's System.dat (PCSX2 / LRPS2).
+pub static PS2_BIOS: &[BiosFile] = &[
+    BiosFile {
+        name: "pcsx2/bios/ps2-0100jd-20000117.bin",
+        md5: &["32f2e4d5ff5ee11072a6bc45530f5765"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0100j-20000117.bin",
+        md5: &["acf4730ceb38ac9d8c7d8e21f2614600"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0101jd-20000217.bin",
+        md5: &["acf9968c8f596d2b15f42272082513d1"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0101j-20000217.bin",
+        md5: &["b1459d7446c69e3e97e6ace3ae23dd1c"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0101xd-20000224.bin",
+        md5: &["d3f1853a16c2ec18f3cd1ae655213308"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0110ad-20000727.bin",
+        md5: &["63e6fd9b3c72e0d7b920e80cf76645cd"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0110a-20000727.bin",
+        md5: &["a20c97c02210f16678ca3010127caf36"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0120a-20000902.bin",
+        md5: &["8db2fbbac7413bf3e7154c1e0715e565"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0120ed-20000902.bin",
+        md5: &["91c87cb2f2eb6ce529a2360f80ce2457"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0120ed-20000902-20030110.bin",
+        md5: &["3016b3dd42148a67e2c048595ca4d7ce"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0120e-20000902.bin",
+        md5: &["b7fa11e87d51752a98b38e3e691cbf17"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0120j-20001027-185015.bin",
+        md5: &["f63bc530bd7ad7c026fcd6f7bd0d9525"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0120j-20001027-191435.bin",
+        md5: &["cee06bd68c333fc5768244eae77e4495"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0150ad-20001228-20030520.bin",
+        md5: &["0bf988e9c7aaa4c051805b0fa6eb3387"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0150a-20001228.bin",
+        md5: &["8accc3c49ac45f5ae2c5db0adc854633"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0150ed-20001228-20030520.bin",
+        md5: &["6f9a6feb749f0533aaae2cc45090b0ed"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0150e-20001228.bin",
+        md5: &["838544f12de9b0abc90811279ee223c8"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0150jd-20010118.bin",
+        md5: &["bb6bbc850458fff08af30e969ffd0175"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0150j-20010118.bin",
+        md5: &["815ac991d8bc3b364696bead3457de7d"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0160a-20010427.bin",
+        md5: &["b107b5710042abe887c0f6175f6e94bb"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0160j-20010427.bin",
+        md5: &["ab55cceea548303c22c72570cfd4dd71"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0160a-20010704.bin",
+        md5: &["18bcaadb9ff74ed3add26cdf709fff2e"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0160e-20010704.bin",
+        md5: &["491209dd815ceee9de02dbbc408c06d6"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0160a-20011004.bin",
+        md5: &["7200a03d51cacc4c14fcdfdbc4898431"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0160e-20011004.bin",
+        md5: &["8359638e857c8bc18c3c18ac17d9cc3c"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0160h-20010730.bin",
+        md5: &["352d2ff9b3f68be7e6fa7e6dd8389346"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0160a-20020207.bin",
+        md5: &["d5ce2c7d119f563ce04bc04dbc3a323e"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0160e-20020319.bin",
+        md5: &["0d2228e6fd4fb639c9c39d077a9ec10c"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0160j-20020426.bin",
+        md5: &["72da56fccb8fcd77bba16d1b6f479914"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0160e-20020426.bin",
+        md5: &["5b1f47fbeb277c6be2fccdd6344ff2fd"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0160h-20020426.bin",
+        md5: &["315a4003535dfda689752cb25f24785c"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0170j-20030206.bin",
+        md5: &["312ad4816c232a9606e56f946bc0678a"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0170ed-20030227.bin",
+        md5: &["666018ffec65c5c7e04796081295c6c7"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0170e-20030227.bin",
+        md5: &["6e69920fa6eef8522a1d688a11e41bc6"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0170ad-20030325.bin",
+        md5: &["eb960de68f0c0f7f9fa083e9f79d0360"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0170a-20030325.bin",
+        md5: &["8aa12ce243210128c5074552d3b86251"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0180cd-20030224.bin",
+        md5: &["240d4c5ddd4b54069bdc4a3cd2faf99d"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0180j-20031028.bin",
+        md5: &["1c6cd089e6c83da618fbf2a081eb4888"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0190j-20030623.bin",
+        md5: &["463d87789c555a4a7604e97d7db545d1"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0190a-20030623.bin",
+        md5: &["35461cecaa51712b300b2d6798825048"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0190e-20030623.bin",
+        md5: &["bd6415094e1ce9e05daabe85de807666"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0190h-20030623.bin",
+        md5: &["2e70ad008d4ec8549aada8002fdf42fb"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0190r-20030623.bin",
+        md5: &["b53d51edc7fc086685e31b811dc32aad"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0190c-20030623.bin",
+        md5: &["1b6e631b536247756287b916f9396872"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0190j-20030822.bin",
+        md5: &["00da1b177096cfd2532c8fa22b43e667"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0190e-20030822.bin",
+        md5: &["afde410bd026c16be605a1ae4bd651fd"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0190a-20040329.bin",
+        md5: &["81f4336c1de607dd0865011c0447052e"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0200j-20040614.bin",
+        md5: &["0eee5d1c779aa50e94edd168b4ebf42e"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0200a-20040614.bin",
+        md5: &["d333558cc14561c1fdc334c75d5f37b7"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0200e-20040614.bin",
+        md5: &["dc752f160044f2ed5fc1f4964db2a095"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0200ed-20040614.bin",
+        md5: &["63ead1d74893bf7f36880af81f68a82d"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0200h-20040614.bin",
+        md5: &["3e3e030c0f600442fa05b94f87a1e238"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0210j-20040917.bin",
+        md5: &["1ad977bb539fc9448a08ab276a836bbc"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220j-20050620.bin",
+        md5: &["eb4f40fcf4911ede39c1bbfe91e7a89a"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220ad-20050620.bin",
+        md5: &["9959ad7a8685cad66206e7752ca23f8b"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220a-20050620.bin",
+        md5: &["929a14baca1776b00869f983aa6e14d2"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220e-20050620.bin",
+        md5: &["573f7d4a430c32b3cc0fd0c41e104bbd"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220h-20050620.bin",
+        md5: &["df63a604e8bff5b0599bd1a6c2721bd0"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220j-20060210.bin",
+        md5: &["5b1ba4bb914406fae75ab8e38901684d"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220a-20060210.bin",
+        md5: &["cb801b7920a7d536ba07b6534d2433ca"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220e-20060210.bin",
+        md5: &["af60e6d1a939019d55e5b330d24b1c25"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220h-20060210.bin",
+        md5: &["549a66d0c698635ca9fa3ab012da7129"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220j-20060905.bin",
+        md5: &["5de9d0d730ff1e7ad122806335332524"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220ad-20060905.bin",
+        md5: &["21fe4cad111f7dc0f9af29477057f88d"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220a-20060905.bin",
+        md5: &["40c11c063b3b9409aa5e4058e984e30c"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220e-20060905.bin",
+        md5: &["80bbb237a6af9c611df43b16b930b683"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0220h-20060905.bin",
+        md5: &["c37bce95d32b2be480f87dd32704e664"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0230j-20080220.bin",
+        md5: &["80ac46fa7e77b8ab4366e86948e54f83"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0230a-20080220.bin",
+        md5: &["21038400dc633070a78ad53090c53017"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0230e-20080220.bin",
+        md5: &["dc69f0643a3030aaa4797501b483d6c4"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0230h-20080220.bin",
+        md5: &["30d56e79d89fbddf10938fa67fe3f34e"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0250e-20100415.bin",
+        md5: &["93ea3bcee4252627919175ff1b16a1d9"],
+    },
+    BiosFile {
+        name: "pcsx2/bios/ps2-0250j-20100415.bin",
+        md5: &["d3e81e95db25f5a86a7b7474550a2155"],
+    },
+];
+
 pub static REQUIREMENTS: &[Requirement] = &[
     Requirement {
         system: "psx",
@@ -118,6 +414,64 @@ pub static REQUIREMENTS: &[Requirement] = &[
         files: &[f!("neogeo.zip")],
         note: "Needed for Neo Geo games only. Must match your MAME/FBNeo romset version, \
                so only the name is checked.",
+    },
+    Requirement {
+        system: "mame",
+        required: false,
+        any_of: false,
+        files: &[f!("neogeo.zip")],
+        note: "Needed for Neo Geo games only. Must match your MAME romset version, so only the \
+               name is checked. Many cores also look for it next to the games.",
+    },
+    Requirement {
+        system: "ps2",
+        required: true,
+        any_of: true,
+        files: PS2_BIOS,
+        note: "PCSX2 / LRPS2 / AetherSX2 need a real PS2 BIOS from your console. Any region works \
+               for most games.",
+    },
+    Requirement {
+        system: "xbox",
+        required: true,
+        any_of: false,
+        files: &[
+            f!("mcpx_1.0.bin"),
+            f!("Complex_4627.bin"),
+            f!("xbox_hdd.qcow2"),
+        ],
+        note: "xemu needs the MCPX boot ROM, a flash BIOS and a hard-disk image. Hashes vary \
+               between dumps, so only names are checked.",
+    },
+    Requirement {
+        system: "gamecube",
+        required: false,
+        any_of: true,
+        files: &[
+            f!(
+                "dolphin-emu/Sys/GC/USA/IPL.bin",
+                "b17148254a5799684c7d783206504926"
+            ),
+            f!(
+                "dolphin-emu/Sys/GC/EUR/IPL.bin",
+                "db92574caab77a7ec99d4605fd6f2450"
+            ),
+            f!(
+                "dolphin-emu/Sys/GC/JAP/IPL.bin",
+                "b17148254a5799684c7d783206504926"
+            ),
+        ],
+        note: "Dolphin runs games without it; the IPL only adds the GameCube boot animation.",
+    },
+    Requirement {
+        system: "dos",
+        required: false,
+        any_of: false,
+        files: &[
+            f!("MT32_CONTROL.ROM", "5626206284b22c2734f3e9efefcd2675"),
+            f!("MT32_PCM.ROM", "89e42e386e82e0cacb4a2704a03706ca"),
+        ],
+        note: "Roland MT-32 ROMs for DOSBox Pure's MIDI music; games play without them.",
     },
     Requirement {
         system: "nds",
@@ -435,7 +789,11 @@ pub fn install(
                 .filter(|f| f.state != FileState::Ok)
                 .map(|f| f.file.name)
                 .collect();
-            let joined = names.join(if rs.req.any_of { " or " } else { ", " });
+            let joined = if rs.req.any_of && names.len() > 6 {
+                format!("any one of {} known BIOS dumps", names.len())
+            } else {
+                names.join(if rs.req.any_of { " or " } else { ", " })
+            };
             let label = format!("{}: {joined}", systems::name_of(rs.req.system));
             if rs.req.required {
                 rep.missing_required.push(label)

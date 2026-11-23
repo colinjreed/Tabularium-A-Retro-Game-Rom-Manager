@@ -13,6 +13,9 @@ const CHUNK: usize = 1 << 20;
 /// the zip directory without decompressing, so "Tetris.zip" and "Tetris.gb"
 /// are recognised as the same game.
 pub fn content_crc(path: &Path) -> io::Result<(String, u64)> {
+    if path.is_dir() {
+        return dir_crc(path);
+    }
     if path
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case("zip"))
@@ -61,4 +64,36 @@ pub fn md5_file(path: &Path) -> io::Result<String> {
 
 pub fn md5_bytes(data: &[u8]) -> String {
     format!("{:x}", Md5::digest(data))
+}
+
+/// CRC of a game folder: every file's relative path and contents, in order.
+fn dir_crc(dir: &Path) -> io::Result<(String, u64)> {
+    let mut files: Vec<_> = walkdir::WalkDir::new(dir)
+        .into_iter()
+        .flatten()
+        .filter(|e| e.file_type().is_file())
+        .map(|e| e.into_path())
+        .collect();
+    files.sort();
+    let mut h = crc32fast::Hasher::new();
+    let mut size = 0;
+    let mut buf = vec![0u8; CHUNK];
+    for p in files {
+        let rel = p
+            .strip_prefix(dir)
+            .unwrap_or(&p)
+            .to_string_lossy()
+            .replace('\\', "/");
+        h.update(rel.to_lowercase().as_bytes());
+        let mut f = File::open(&p)?;
+        loop {
+            let n = f.read(&mut buf)?;
+            if n == 0 {
+                break;
+            }
+            h.update(&buf[..n]);
+            size += n as u64;
+        }
+    }
+    Ok((format!("{:08x}", h.finalize()), size))
 }
