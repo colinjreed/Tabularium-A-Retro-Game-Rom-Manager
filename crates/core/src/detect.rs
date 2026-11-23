@@ -228,28 +228,31 @@ pub fn sniff(path: &Path) -> Option<(&'static System, Confidence)> {
         let kind = head
             .get(0x48..0x4C)
             .map(|b| u32::from_be_bytes(b.try_into().unwrap()));
-        return if kind == Some(1) {
-            strong("gamecube")
-        } else {
-            None
-        }; // 2 = Wii
+        return match kind {
+            Some(1) => strong("gamecube"),
+            Some(2) => strong("wii"),
+            _ => None,
+        };
     }
     if at(&head, 0, &[0x01, 0xC0, 0x0B, 0xB1]) {
         let sub = head
             .get(4..8)
             .map(|b| u32::from_le_bytes(b.try_into().unwrap()));
-        return if sub == Some(0) {
-            strong("gamecube")
-        } else {
-            None
+        return match sub {
+            Some(0) => strong("gamecube"),
+            Some(1) => strong("wii"),
+            _ => None,
         };
     }
     if ext == "ciso" && at(&head, 0, b"CISO") {
         return strong("gamecube");
     }
-    // GameCube disc header magic (0x5D1C9EA3 at 0x18 would be Wii).
+    // GameCube / Wii disc header magic.
     if at(&head, 0x1C, &[0xC2, 0x33, 0x9F, 0x3D]) {
         return strong("gamecube");
+    }
+    if at(&head, 0x18, &[0x5D, 0x1C, 0x9E, 0xA3]) {
+        return strong("wii");
     }
     if at(&head, 0x100, b"SEGA 32X") {
         return strong("sega32x");
@@ -401,7 +404,6 @@ pub fn detect(path: &Path, root: Option<&Path>, forced: Option<&'static System>)
     }
     let by_ext = match ext.as_str() {
         "gdi" | "cdi" => systems::get("dreamcast"),
-        "rvz" | "wia" => None, // Wii discs aren't supported
         "cso" => systems::get("psp"),
         "pbp" => systems::get("psx"),
         _ => None,
@@ -426,11 +428,24 @@ pub fn detect(path: &Path, root: Option<&Path>, forced: Option<&'static System>)
 /// named after DOS or ScummVM.
 pub fn folder_game_system(dir: &Path) -> Option<&'static System> {
     let name = dir.file_name()?.to_string_lossy().to_ascii_lowercase();
-    if name.ends_with(".scummvm") || name.ends_with(".svm") {
-        return systems::get("scummvm");
+    for (suffix, system) in systems::FOLDER_SUFFIXES {
+        if name.len() > suffix.len() + 1 && name.ends_with(&format!(".{suffix}")) {
+            return systems::get(system);
+        }
     }
-    if name.ends_with(".pc") || name.ends_with(".dos") {
-        return systems::get("dos");
+    // Directly inside a DOS / ScummVM folder: a game, whatever it's called
+    // ("DOS/Doom" is the game Doom, not the Doom-engine system).
+    let parent_system = dir
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|n| systems::from_folder_name(&n.to_string_lossy()))
+        .filter(|s| systems::folder_games(s.id));
+    if let Some(s) = parent_system {
+        if systems::from_folder_name(&name)
+            .is_none_or(|own| !systems::folder_games(own.id) || own.id == s.id)
+        {
+            return Some(s);
+        }
     }
     // A folder that is itself a system folder ("DOS", "scummvm") isn't a game.
     if systems::from_folder_name(&name).is_some() {

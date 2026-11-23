@@ -17,6 +17,8 @@ pub struct Settings {
     /// libretro fuzzy-match strictness, 0.5..1.0.
     pub match_cutoff: f64,
     pub last_card_folder: Option<PathBuf>,
+    /// Show Super Famicom / Mega Drive style names instead of US ones.
+    pub system_names: tabularium_core::systems::NameRegion,
 }
 
 impl Default for Settings {
@@ -28,6 +30,7 @@ impl Default for Settings {
             remember_passwords: false,
             match_cutoff: 0.92,
             last_card_folder: None,
+            system_names: Default::default(),
         }
     }
 }

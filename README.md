@@ -137,12 +137,46 @@ Xbox files xemu needs (`mcpx_1.0.bin`, `Complex_4627.bin`,
 Firmware updates sometimes rename folders. Every system's folder name can be
 overridden per SD card under *Artwork and extras → Folder names on the card*.
 
-44 systems are supported: NES, Famicom Disk System, SNES, Game Boy / Color /
-Advance, N64, DS, 3DS, GameCube, Virtual Boy, Pokémon Mini, Genesis, 32X,
-Master System, Game Gear, SG-1000, Sega CD, Saturn, Dreamcast, PlayStation
-1 and 2, PSP, Xbox, PC Engine (and CD), Atari 2600 / 7800 / Lynx, Neo Geo
-Pocket (Color), WonderSwan (Color), ColecoVision, MSX, Vectrex, PICO-8, DOS,
-ScummVM, and arcade (FBNeo, MAME, CPS-1, CPS-2, CPS-3).
+149 systems are supported: every ROM folder in ES-DE's default layout, so
+whatever system a file is for, Tabularium can file it. That covers:
+
+* **Consoles and handhelds:** Nintendo (NES/Famicom to Switch, Wii and
+  Wii U, plus Satellaview, Sufami Turbo and 64DD), Sega (SG-1000 to
+  Dreamcast), Sony (PS1 to PS3, PSP, Vita), Microsoft (Xbox, Xbox 360),
+  NEC (PC Engine, SuperGrafx, PC-FX), SNK (Neo Geo, Neo Geo CD, Pocket),
+  Atari (2600 to Jaguar CD), 3DO, CD-i, Intellivision, Odyssey² /
+  Videopac, ColecoVision, Vectrex, WonderSwan, Game & Watch, and dozens of
+  rarer ones (Arcadia 2001, Gamate, Mega Duck, Super A'Can, V.Smile…).
+* **Computers:** Commodore 64 / VIC-20 / Plus/4 / Amiga / CDTV / CD32,
+  Amstrad CPC, ZX Spectrum / ZX81 / Next, MSX / MSX2 / turbo R, Apple II /
+  IIGS / Macintosh, Atari 800 / ST, BBC Micro / Electron / Archimedes, PC-88
+  / PC-98 / X1 / X68000 / FM-7 / FM Towns, TRS-80, CoCo, Dragon, Oric,
+  Thomson MO/TO, TI-99, SAM Coupé, DOS and Windows 3.x / 9x.
+* **Arcade:** FBNeo, MAME, CPS-1/2/3, Neo Geo, NAOMI / NAOMI 2,
+  Atomiswave, Model 2 / 3, ST-V, Triforce, LaserDisc (Daphne / Singe).
+* **Engines and fantasy consoles:** ScummVM, Doom, Quake, PICO-8, TIC-80,
+  WASM-4, Vircon32, Uzebox, Arduboy, OpenBOR, M.U.G.E.N, EasyRPG, Solarus,
+  LowRes NX, Lutro, ChaiLove, Z-machine, Flash, J2ME, N-Gage, Symbian,
+  Palm, Future / Visual Pinball.
+
+ES-DE's regional folders (`megadrivejp`, `snesna`, `famicom`, `tg16`,
+`mark3`…) and Batocera's folder names are all recognised. Launcher
+categories (Steam, Epic, Lutris, Kodi, Android apps, desktop shortcuts)
+aren't, since they hold shortcuts to installed software rather than ROMs.
+
+**How files are recognised:**
+* A file whose extension belongs to one system (`.d64`, `.adf`, `.nsp`,
+  `.tzx`…) is sorted by extension.
+* Formats many systems share (`.dsk`, `.tap`, `.cas`, `.d88`, `.bin`…) are
+  sorted by the name of the folder they're in, e.g. `Amstrad CPC`, `msx`,
+  `coco`. Without one they're listed as unidentified rather than guessed.
+
+Some newer systems (PS3, Switch, Wii U, Xbox 360…) need far more than a
+handheld can offer; they're there so the library can hold everything.
+
+**System names:** in Settings you can choose US, European or Japanese
+names: Super Nintendo / Super Famicom, Genesis / Mega Drive, TurboGrafx-16
+/ PC Engine, Master System / Mark III, and so on.
 
 ### Disc systems: PS1 vs PS2, GameCube, Xbox
 

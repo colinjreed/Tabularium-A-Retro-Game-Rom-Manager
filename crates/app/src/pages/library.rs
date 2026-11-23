@@ -414,7 +414,11 @@ impl RomApp {
                         ui.label(label).on_hover_text(r.file_name());
                     });
                     row.col(|ui| {
-                        ui.label(systems::get(&r.system).map(|s| s.name).unwrap_or(&r.system));
+                        ui.label(
+                            systems::get(&r.system)
+                                .map(|s| s.display_name())
+                                .unwrap_or(&r.system),
+                        );
                     });
                     row.col(|ui| {
                         if show_trash {

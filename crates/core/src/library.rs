@@ -193,8 +193,9 @@ pub fn split_name(p: &Path) -> (String, String) {
         .to_string_lossy()
         .to_string();
     if p.is_dir() {
-        for suf in [".scummvm", ".svm", ".pc", ".dos"] {
-            if name.to_ascii_lowercase().ends_with(suf) && name.len() > suf.len() {
+        for (suf, _) in crate::systems::FOLDER_SUFFIXES {
+            let suf = format!(".{suf}");
+            if name.to_ascii_lowercase().ends_with(&suf) && name.len() > suf.len() {
                 let cut = name.len() - suf.len();
                 return (name[..cut].to_string(), name[cut..].to_string());
             }

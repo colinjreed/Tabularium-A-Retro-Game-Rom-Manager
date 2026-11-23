@@ -462,7 +462,7 @@ impl RomApp {
                 ).weak());
                 egui::Grid::new("folders").num_columns(2).spacing([12.0, 4.0]).show(ui, |ui| {
                     for s in systems::SYSTEMS.iter().filter(|s| stats.get(s.id).is_some_and(|st| st.count > 0)) {
-                        ui.label(s.name);
+                        ui.label(s.display_name());
                         let default = profile.system_folder(s, &BTreeMap::new());
                         let mut v = col.folder_overrides.get(s.id).cloned().unwrap_or_default();
                         if ui.add(egui::TextEdit::singleline(&mut v).hint_text(default).desired_width(220.0)).changed() {

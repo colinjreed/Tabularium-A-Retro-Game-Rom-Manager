@@ -75,6 +75,34 @@ impl RomApp {
         });
         ui.add_space(10.0);
         card(ui, |ui| {
+            section(ui, "System names");
+            use tabularium_core::systems::{set_name_region, NameRegion};
+            for (r, label) in [
+                (
+                    NameRegion::Us,
+                    "North America: Super Nintendo, Genesis, TurboGrafx-16",
+                ),
+                (
+                    NameRegion::Europe,
+                    "Europe: Super Nintendo, Mega Drive, PC Engine",
+                ),
+                (
+                    NameRegion::Japan,
+                    "Japan: Super Famicom, Mega Drive, PC Engine, Mark III",
+                ),
+            ] {
+                if ui
+                    .radio_value(&mut self.settings.system_names, r, label)
+                    .changed()
+                {
+                    set_name_region(r);
+                    self.view.invalidate();
+                }
+            }
+            ui.label(RichText::new("Only changes the names shown here; folder names on SD cards follow each firmware.").weak());
+        });
+        ui.add_space(10.0);
+        card(ui, |ui| {
             section(ui, "libretro artwork matching");
             ui.add(
                 egui::Slider::new(&mut self.settings.match_cutoff, 0.70..=1.0).text("strictness"),

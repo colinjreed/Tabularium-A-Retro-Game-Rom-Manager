@@ -91,11 +91,11 @@ impl RomApp {
             ui.horizontal(|ui| {
                 ui.label("System:");
                 egui::ComboBox::from_id_salt("forced-system")
-                    .selected_text(self.import.forced.and_then(systems::get).map(|s| s.name).unwrap_or("Detect automatically"))
+                    .selected_text(self.import.forced.and_then(systems::get).map(|s| s.display_name()).unwrap_or("Detect automatically"))
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut self.import.forced, None, "Detect automatically");
                         for s in systems::SYSTEMS {
-                            ui.selectable_value(&mut self.import.forced, Some(s.id), s.name);
+                            ui.selectable_value(&mut self.import.forced, Some(s.id), s.display_name());
                         }
                     })
                     .response

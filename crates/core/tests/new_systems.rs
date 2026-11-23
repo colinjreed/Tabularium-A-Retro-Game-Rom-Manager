@@ -183,7 +183,7 @@ fn new_systems_end_to_end() {
     assert_eq!(sys("Crash Bandicoot (USA)"), Some("psx"));
     assert_eq!(sys("Metroid Prime (USA)"), Some("gamecube"));
     assert_eq!(sys("Pikmin (USA)"), Some("gamecube"));
-    assert_eq!(sys("Wii Sports (USA)"), None); // Wii isn't supported
+    assert_eq!(sys("Wii Sports (USA)"), Some("wii"));
     assert_eq!(sys("Halo - Combat Evolved (USA)"), Some("xbox"));
     assert_eq!(sys("Super Mario 3D Land (USA)"), Some("n3ds"));
     assert_eq!(sys("Doom"), Some("dos"));

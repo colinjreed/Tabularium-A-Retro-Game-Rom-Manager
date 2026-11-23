@@ -92,7 +92,10 @@ pub fn systems_picker(
             for s in &present {
                 let mut on = selected.iter().any(|x| x == s.id);
                 let n = stats.get(s.id).map(|st| st.count).unwrap_or(0);
-                if ui.checkbox(&mut on, format!("{}  ({n})", s.name)).changed() {
+                if ui
+                    .checkbox(&mut on, format!("{}  ({n})", s.display_name()))
+                    .changed()
+                {
                     if on {
                         selected.push(s.id.to_string());
                     } else {

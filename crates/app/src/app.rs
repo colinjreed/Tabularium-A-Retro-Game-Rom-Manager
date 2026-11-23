@@ -88,6 +88,7 @@ impl RomApp {
         cc.egui_ctx.set_global_style(style);
 
         let mut settings = Settings::load(cc.storage);
+        tabularium_core::systems::set_name_region(settings.system_names);
         settings.screenscraper = settings.screenscraper.clone().with_env_fallback();
         let mut app = RomApp {
             settings,
