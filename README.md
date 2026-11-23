@@ -1,5 +1,12 @@
 # Tabularium
 
+> **Disclaimer: this is a vibe-coded project.** The code was written by an
+> AI assistant (Claude) from my descriptions and feedback. I steer, test it
+> on my own collection and handhelds, and decide what goes in, but I didn't
+> write the code by hand and haven't reviewed every line. It has automated
+> tests, but expect rough edges. Keep backups of your ROMs and SD cards,
+> and judge for yourself whether that's something you want to use.
+
 A desktop app for Windows, macOS and Linux that organises a retro game ROM
 collection, weeds out duplicates and junk, downloads artwork, checks BIOS
 files, and builds ready-to-use SD cards for handhelds (Onion OS, muOS,
