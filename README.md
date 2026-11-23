@@ -39,6 +39,14 @@ your messy folders ──Import──▶ LIBRARY (sorted by system, indexed)
    32X, PS1, PSP, Sega CD, Saturn). Byte-identical copies are skipped, even a
    zipped and an unzipped copy of the same game. Use *Preview* first to see
    what will happen.
+   By default, files are renamed to their **official No-Intro names**,
+   looked up by checksum for cartridge systems. So `003 sonic.md` becomes
+   `Sonic The Hedgehog (USA, Europe).md`, and games filed under the wrong
+   system (e.g. Game Gear games saved as `.sms`) are moved. Files not in
+   the lists still lose numbering like `003 - ` when most of their folder
+   is numbered that way. For a library you've already imported, use
+   **Clean up → File names → Find names to fix**, check the preview, then
+   press *Rename them*.
 3. **Clean up** (optional). Tick what you don't want (betas, prototypes,
    demos, hacks, bad dumps…) and turn on *one game, one ROM* to keep only
    the best region and latest revision of each game. Results go to the trash,

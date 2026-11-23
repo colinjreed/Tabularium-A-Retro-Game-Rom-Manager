@@ -206,6 +206,22 @@ impl RomApp {
             }) => {
                 self.cards.export_result = Some((report, dest, dry_run));
             }
+            Some(JobOutput::Rename { report, applied }) => {
+                if applied {
+                    self.reload();
+                    let mut msg = format!("Renamed {} ROM(s).", report.applied);
+                    if !report.conflicts.is_empty() {
+                        msg += &format!(
+                            " {} skipped because the name was taken.",
+                            report.conflicts.len()
+                        );
+                    }
+                    self.notify(msg);
+                    self.clean.rename = None;
+                } else {
+                    self.clean.rename = Some(report);
+                }
+            }
             Some(JobOutput::BiosImport(r)) => {
                 self.bios.import_result = Some(r);
                 self.bios.lib_status = None;

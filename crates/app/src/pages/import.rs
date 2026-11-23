@@ -7,13 +7,28 @@ use rom_manager_core::library::Library;
 use rom_manager_core::systems;
 use std::path::PathBuf;
 
-#[derive(Default)]
 pub struct ImportPage {
     pub sources: Vec<PathBuf>,
     pub move_files: bool,
     pub forced: Option<&'static str>,
     pub keep_unknown: bool,
+    pub official_names: bool,
+    pub strip_numbers: bool,
     pub result: Option<(ImportReport, bool)>,
+}
+
+impl Default for ImportPage {
+    fn default() -> Self {
+        ImportPage {
+            sources: vec![],
+            move_files: false,
+            forced: None,
+            keep_unknown: false,
+            official_names: true,
+            strip_numbers: true,
+            result: None,
+        }
+    }
 }
 
 impl RomApp {
@@ -90,6 +105,22 @@ impl RomApp {
                 &mut self.import.keep_unknown,
                 "Copy files I can't identify into the library's 'unsorted' folder",
             );
+            ui.checkbox(
+                &mut self.import.official_names,
+                "Rename to official names (looked up by each file's checksum)",
+            )
+            .on_hover_text(
+                "Uses the No-Intro lists for cartridge systems, e.g. '003 sonic.md' becomes \
+                 'Sonic The Hedgehog (USA, Europe).md'. Also catches games filed under the wrong \
+                 system, like Game Gear games saved as .sms.",
+            );
+            ui.checkbox(
+                &mut self.import.strip_numbers,
+                "Remove numbering like '003 - ' from the start of names",
+            )
+            .on_hover_text(
+                "Only when most files in a folder are numbered, so titles like '1942' are kept.",
+            );
 
             ui.add_space(8.0);
             ui.horizontal(|ui| {
@@ -139,6 +170,8 @@ impl RomApp {
             dry_run,
             forced_system: self.import.forced.and_then(systems::get),
             keep_unknown: self.import.keep_unknown,
+            official_names: self.import.official_names,
+            strip_numbers: self.import.strip_numbers,
         };
         let sources = self.import.sources.clone();
         self.import.result = None;

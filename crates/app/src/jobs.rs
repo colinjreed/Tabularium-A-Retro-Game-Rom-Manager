@@ -23,6 +23,10 @@ pub enum JobOutput {
         dry_run: bool,
     },
     BiosImport(Vec<(PathBuf, ImportOutcome)>),
+    Rename {
+        report: rom_manager_core::rename::FixReport,
+        applied: bool,
+    },
     Error(String),
 }
 

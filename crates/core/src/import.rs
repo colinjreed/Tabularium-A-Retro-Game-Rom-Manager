@@ -12,6 +12,11 @@ use std::path::PathBuf;
 pub struct ImportOptions {
     /// Network access for arcade / ScummVM name lists (None = offline).
     pub fetch: Option<crate::http::Fetcher>,
+    /// Rename to official No-Intro names (needs `fetch`) and fix the system
+    /// when the checksum says so.
+    pub official_names: bool,
+    /// Remove "003 - " style numbering from names that aren't in the lists.
+    pub strip_numbers: bool,
     pub move_files: bool,
     pub dry_run: bool,
     /// Treat every file as this system.
@@ -47,6 +52,16 @@ pub fn import(
     rep.progress(0, 0, "Scanning folders…");
     let mut found = scan(sources, opts.forced_system, &|| rep.cancelled());
     recognise_arcade_zips(lib, &mut found.sets, opts, rep);
+    if opts.official_names || opts.strip_numbers {
+        let mut dats = match (&opts.fetch, opts.official_names) {
+            (Some(f), true) => Some(crate::dats::Dats::new(
+                crate::metadata::cache_dir(lib),
+                f.clone(),
+            )),
+            _ => None,
+        };
+        crate::rename::plan_import(&mut found.sets, dats.as_mut(), opts.strip_numbers, rep);
+    }
     out.ignored = found.skipped.len();
     let total = found.sets.len();
     lib.begin()?;

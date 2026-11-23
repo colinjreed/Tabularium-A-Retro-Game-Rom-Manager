@@ -432,3 +432,18 @@ mod arcade_tests {
         assert_eq!(f.revision, vec![1]);
     }
 }
+
+/// Make a name safe as a file name on Windows, macOS and Linux (and on
+/// FAT/exFAT SD cards).
+pub fn safe_filename(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| match c {
+            ':' => '-',
+            '<' | '>' | '"' | '/' | '\\' | '|' | '?' | '*' => '_',
+            c if c.is_control() => '_',
+            c => c,
+        })
+        .collect();
+    cleaned.trim().trim_end_matches('.').to_string()
+}

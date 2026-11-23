@@ -22,6 +22,8 @@ const IGNORED_EXTS: &[&str] = &[
 /// A playable unit: one file, or a .cue/.gdi plus the files it references.
 #[derive(Debug, Clone)]
 pub struct RomSet {
+    /// New file name stem to use in the library (official name), if any.
+    pub rename: Option<String>,
     pub main: PathBuf,
     pub companions: Vec<PathBuf>,
     pub system: Option<&'static System>,
@@ -347,6 +349,7 @@ pub fn detect(path: &Path, root: Option<&Path>, forced: Option<&'static System>)
         .filter(|p| p.exists() && p != path)
         .collect();
     let mut rs = RomSet {
+        rename: None,
         main: path.to_path_buf(),
         companions,
         system: None,
@@ -360,13 +363,18 @@ pub fn detect(path: &Path, root: Option<&Path>, forced: Option<&'static System>)
         set(forced, "chosen");
         return rs;
     }
+    let hint = folder_hint(path, root);
     if !AMBIGUOUS_EXTS.contains(&ext.as_str()) {
         if let Some(s) = systems::by_unique_ext(&ext) {
-            set(Some(s), "extension");
+            // A folder for a system that also uses this extension wins:
+            // Game Gear games dumped as .sms belong in Game Gear.
+            match hint.filter(|h| h.id != s.id && h.extra_exts.contains(&ext.as_str())) {
+                Some(h) => set(Some(h), "folder name"),
+                None => set(Some(s), "extension"),
+            }
             return rs;
         }
     }
-    let hint = folder_hint(path, root);
     if ext == "zip" {
         let (s, why) = zip_system(path);
         if s.is_some() {
@@ -517,6 +525,7 @@ pub fn scan(
     for (dir, sys) in folder_games {
         let system = forced.or(Some(sys));
         out.sets.push(RomSet {
+            rename: None,
             main: dir,
             companions: vec![],
             system,

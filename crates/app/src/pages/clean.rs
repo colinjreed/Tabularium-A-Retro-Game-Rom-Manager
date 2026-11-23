@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 
 #[derive(Default)]
 pub struct CleanPage {
+    pub rename: Option<rom_manager_core::rename::FixReport>,
     pub spec: FilterSpec,
     pub systems: Vec<String>,
     pub results: Option<Vec<Rejected>>,
@@ -34,6 +35,23 @@ impl RomApp {
                      trash, where you can restore them.",
                 );
                 card(ui, |ui| {
+                    section(ui, "File names");
+                    ui.label(
+                        "Rename ROMs to their official names, looked up by checksum in the No-Intro \
+                         lists, and remove numbering like '003 - '. Also moves games filed under the \
+                         wrong system (e.g. Game Gear games saved as .sms). Disc-based and arcade \
+                         systems aren't renamed.",
+                    );
+                    if ui
+                        .add_enabled(!self.busy(), egui::Button::new(RichText::new("Find names to fix").strong()))
+                        .clicked()
+                    {
+                        self.clean.results = None;
+                        self.start_rename(ui.ctx(), false);
+                    }
+                });
+                ui.add_space(10.0);
+                card(ui, |ui| {
                     section(ui, "Systems");
                     if systems_picker(ui, "clean-systems", &mut self.clean.systems, &self.data.stats) {
                         self.clean.results = None;
@@ -57,6 +75,73 @@ impl RomApp {
 
     fn clean_results(&mut self, ui: &mut Ui) {
         ui.add_space(6.0);
+        if let Some(rep) = &self.clean.rename {
+            if rep.changes.is_empty() {
+                ui.label(
+                    RichText::new(format!(
+                        "All {} cartridge ROMs already have good names.",
+                        rep.checked
+                    ))
+                    .strong(),
+                );
+                if ui.button("Close").clicked() {
+                    self.clean.rename = None;
+                }
+                return;
+            }
+            let moved = rep
+                .changes
+                .iter()
+                .filter(|c| c.new_system != c.rom.system)
+                .count();
+            ui.label(
+                RichText::new(format!("{} name(s) to fix", rep.changes.len()))
+                    .strong()
+                    .size(15.0),
+            );
+            if moved > 0 {
+                ui.label(format!("{moved} of them move to a different system"));
+            }
+            ui.horizontal(|ui| {
+                if ui
+                    .add_enabled(
+                        !self.busy(),
+                        egui::Button::new(RichText::new("Rename them").strong()),
+                    )
+                    .clicked()
+                {
+                    self.start_rename(ui.ctx(), true);
+                }
+                if ui.button("Cancel").clicked() {
+                    self.clean.rename = None;
+                }
+            });
+            ui.separator();
+            if let Some(rep) = &self.clean.rename {
+                egui::Grid::new("rename-list")
+                    .striped(true)
+                    .num_columns(1)
+                    .show(ui, |ui| {
+                        for c in rep.changes.iter().take(3000) {
+                            ui.vertical(|ui| {
+                                ui.label(RichText::new(&c.rom.stem).weak());
+                                let arrow = if c.new_system != c.rom.system {
+                                    format!(
+                                        "> {}  (to {})",
+                                        c.new_stem,
+                                        systems::name_of(&c.new_system)
+                                    )
+                                } else {
+                                    format!("> {}", c.new_stem)
+                                };
+                                ui.label(arrow);
+                            });
+                            ui.end_row();
+                        }
+                    });
+            }
+            return;
+        }
         let Some(results) = &self.clean.results else {
             ui.label(RichText::new("Choose what to remove, then press Find.").weak());
             return;
@@ -120,6 +205,34 @@ impl RomApp {
         if results.len() > 3000 {
             ui.label(format!("…and {} more", results.len() - 3000));
         }
+    }
+
+    fn start_rename(&mut self, ctx: &egui::Context, apply: bool) {
+        let Some(root) = self.library_root() else {
+            return;
+        };
+        let title = if apply {
+            "Renaming"
+        } else {
+            "Looking up official names"
+        };
+        self.job = Some(Job::spawn(title, ctx, move |rep| {
+            let lib = match Library::open(&root) {
+                Ok(l) => l,
+                Err(e) => return JobOutput::Error(e.to_string()),
+            };
+            let mut dats = rom_manager_core::dats::Dats::new(
+                rom_manager_core::metadata::cache_dir(&lib),
+                rom_manager_core::http::default_fetcher(),
+            );
+            match rom_manager_core::rename::fix_library(&lib, Some(&mut dats), true, apply, rep) {
+                Ok(report) => JobOutput::Rename {
+                    report,
+                    applied: apply,
+                },
+                Err(e) => JobOutput::Error(e.to_string()),
+            }
+        }));
     }
 
     fn start_trash(&mut self, ctx: &egui::Context) {

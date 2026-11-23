@@ -3,6 +3,7 @@
 
 pub mod bios;
 pub mod collection;
+pub mod dats;
 pub mod detect;
 pub mod filters;
 pub mod folder_games;
@@ -14,6 +15,7 @@ pub mod metadata;
 pub mod naming;
 pub mod profiles;
 pub mod progress;
+pub mod rename;
 pub mod scrape;
 pub mod scrapers;
 pub mod systems;

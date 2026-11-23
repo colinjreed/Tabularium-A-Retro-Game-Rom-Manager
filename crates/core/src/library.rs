@@ -80,6 +80,8 @@ pub struct Rom {
     pub status_reason: Option<String>,
     /// Full name for arcade sets ("Street Fighter II …" for sf2.zip).
     pub alt_name: Option<String>,
+    /// Where the file was imported from.
+    pub source: Option<String>,
 }
 
 impl Rom {
@@ -106,7 +108,12 @@ impl Rom {
             status: r.get("status")?,
             status_reason: r.get("status_reason")?,
             alt_name: r.get("alt_name").unwrap_or(None),
+            source: r.get("source").unwrap_or(None),
         })
+    }
+
+    pub fn source_path(&self) -> Option<&str> {
+        self.source.as_deref()
     }
 
     /// What to show people: the arcade full name, else the file name.
@@ -413,16 +420,18 @@ impl Library {
             return Ok(AddOutcome::Duplicate(existing.path));
         }
         let dest_dir = self.root.join("roms").join(sys.id);
-        let name = rs.main.file_name().unwrap_or_default();
-        let mut main_dest = dest_dir.join(name);
+        let (stem, ext) = match (&rs.rename, rs.companions.is_empty() && rs.main.is_file()) {
+            (Some(new), true) => (naming::safe_filename(new), split_name(&rs.main).1),
+            _ => split_name(&rs.main),
+        };
+        let name = format!("{stem}{ext}");
+        let mut main_dest = dest_dir.join(&name);
         if main_dest.exists() {
             if !rs.companions.is_empty() {
                 return Ok(AddOutcome::Conflict(format!(
-                    "{} already exists with different data",
-                    name.to_string_lossy()
+                    "{name} already exists with different data"
                 )));
             }
-            let (stem, ext) = split_name(&rs.main);
             let mut n = 2;
             while dest_dir.join(format!("{stem} ({n}){ext}")).exists() {
                 n += 1;
@@ -563,6 +572,72 @@ impl Library {
             self.db.execute("DELETE FROM roms WHERE id = ?1", [r.id])?;
         }
         Ok(trashed.len())
+    }
+
+    /// Move a ROM to another system and/or give it a new file name stem,
+    /// renaming its artwork too. Returns false if the target name is taken.
+    pub fn relocate_rom(&self, rom: &Rom, system: &str, new_stem: &str) -> Result<bool> {
+        let new_stem = naming::safe_filename(new_stem);
+        let src = self.root.join(&rom.path);
+        let (_, ext) = split_name(&src);
+        let dir = self.root.join("roms").join(system);
+        let dest = dir.join(format!("{new_stem}{ext}"));
+        if dest == src {
+            return Ok(true);
+        }
+        // Case-only renames are fine on case-insensitive disks.
+        let same_file =
+            dest.to_string_lossy().to_lowercase() == src.to_string_lossy().to_lowercase();
+        if dest.exists() && !same_file {
+            return Ok(false);
+        }
+        fs::create_dir_all(&dir)?;
+        if same_file {
+            let tmp = dir.join(format!(".renaming-{}", rom.id));
+            fs::rename(&src, &tmp)?;
+            fs::rename(&tmp, &dest)?;
+        } else {
+            move_file(&src, &dest)?;
+        }
+        let p = naming::parse(&new_stem);
+        let rel_main = rel(&self.root, &dest);
+        let flags: Vec<&String> = p.flags.iter().collect();
+        self.db.execute(
+            "UPDATE roms SET system=?1, path=?2, files=?3, stem=?4, title=?5, key=?6, regions=?7, languages=?8, \
+             revision=?9, disc=?10, flags=?11, verified=?12 WHERE id=?13",
+            params![
+                system,
+                rel_main,
+                serde_json::to_string(&vec![rel_main.clone()]).unwrap(),
+                new_stem,
+                p.title,
+                p.key,
+                serde_json::to_string(&p.regions).unwrap(),
+                serde_json::to_string(&p.languages).unwrap(),
+                serde_json::to_string(&p.revision).unwrap(),
+                p.disc.map(|d| d as i64),
+                serde_json::to_string(&flags).unwrap(),
+                p.verified as i64,
+                rom.id
+            ],
+        )?;
+        // Rename cached artwork to match.
+        for (kind, path) in self.media(rom.id)? {
+            let ext = path
+                .extension()
+                .map(|e| e.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let target = self
+                .media_dir(system, &kind)
+                .join(format!("{new_stem}.{ext}"));
+            if target != path {
+                fs::create_dir_all(target.parent().unwrap())?;
+                if move_file(&path, &target).is_ok() {
+                    self.set_media(rom.id, &kind, Some(&target), None)?;
+                }
+            }
+        }
+        Ok(true)
     }
 
     /// Record an arcade set's full name and re-derive its title, region and flags.

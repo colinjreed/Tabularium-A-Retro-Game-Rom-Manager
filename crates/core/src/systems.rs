@@ -280,7 +280,7 @@ pub static SYSTEMS: &[System] = &[
         "Sega Game Gear",
         Some("Sega - Game Gear"),
         &["gg"],
-        ZIP,
+        &["sms", "zip", "7z"],
         &["gamegear", "gg"],
         "gamegear",
         "gamegear",
