@@ -10,6 +10,9 @@ use egui::{
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
+mod extras;
+pub use extras::*;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ThemeId {
     #[default]
@@ -416,23 +419,23 @@ pub fn install_fonts(ctx: &Context) {
     for (key, bytes) in [
         (
             "pixel",
-            &include_bytes!("../../../assets/fonts/PressStart2P-Regular.ttf")[..],
+            &include_bytes!("../../../../assets/fonts/PressStart2P-Regular.ttf")[..],
         ),
         (
             "terminal",
-            &include_bytes!("../../../assets/fonts/VT323-Regular.ttf")[..],
+            &include_bytes!("../../../../assets/fonts/VT323-Regular.ttf")[..],
         ),
         (
             "rubik",
-            &include_bytes!("../../../assets/fonts/Rubik.ttf")[..],
+            &include_bytes!("../../../../assets/fonts/Rubik.ttf")[..],
         ),
         (
             "orbitron",
-            &include_bytes!("../../../assets/fonts/Orbitron.ttf")[..],
+            &include_bytes!("../../../../assets/fonts/Orbitron.ttf")[..],
         ),
         (
             "techmono",
-            &include_bytes!("../../../assets/fonts/ShareTechMono-Regular.ttf")[..],
+            &include_bytes!("../../../../assets/fonts/ShareTechMono-Regular.ttf")[..],
         ),
     ] {
         fonts
@@ -660,12 +663,12 @@ impl Textures {
             self.circuit = Some(load_png(
                 ctx,
                 "circuit",
-                include_bytes!("../../../assets/themes/circuit.png"),
+                include_bytes!("../../../../assets/themes/circuit.png"),
             ));
             self.cyberdeck = Some(load_png(
                 ctx,
                 "cyberdeck",
-                include_bytes!("../../../assets/themes/cyberdeck.png"),
+                include_bytes!("../../../../assets/themes/cyberdeck.png"),
             ));
             self.dither_gb = Some(pattern(ctx, "dither-light", 2, 2, |x, y| {
                 if (x + y) % 2 == 0 {

@@ -198,6 +198,7 @@ impl RomApp {
                     .clicked()
             {
                 self.surprise_me();
+                self.sfx(crate::sound::Sfx::Select);
             }
             if self.view.show_trash && !self.data.trashed.is_empty() {
                 if ui.button("Restore all").clicked() {

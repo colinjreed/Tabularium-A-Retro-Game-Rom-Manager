@@ -3,6 +3,8 @@
 use crate::jobs::{Job, JobOutput};
 use crate::pages;
 use crate::settings::Settings;
+use crate::sound::{Sfx, Sound};
+use crate::themes::{self, Icon};
 use crate::widgets;
 use egui::{Color32, RichText, Ui};
 use std::collections::{BTreeMap, HashSet};
@@ -34,16 +36,17 @@ impl Page {
         Page::Settings,
     ];
 
-    fn label(self) -> &'static str {
+    /// (pixel icon, emoji, name)
+    fn label(self) -> (Icon, &'static str, &'static str) {
         match self {
-            Page::Library => "📚  Library",
-            Page::Import => "📥  Import",
-            Page::Clean => "✂  Clean up",
-            Page::Artwork => "🖼  Artwork",
-            Page::Bios => "🔑  BIOS",
-            Page::Collections => "💾  SD cards",
-            Page::Themes => "🎨  Themes",
-            Page::Settings => "⚙  Settings",
+            Page::Library => (Icon::Library, "📚", "Library"),
+            Page::Import => (Icon::Import, "📥", "Import"),
+            Page::Clean => (Icon::Clean, "✂", "Clean up"),
+            Page::Artwork => (Icon::Artwork, "🖼", "Artwork"),
+            Page::Bios => (Icon::Bios, "🔑", "BIOS"),
+            Page::Collections => (Icon::Sd, "💾", "SD cards"),
+            Page::Themes => (Icon::Themes, "🎨", "Themes"),
+            Page::Settings => (Icon::Settings, "⚙", "Settings"),
         }
     }
 }
@@ -69,6 +72,9 @@ pub struct RomApp {
     /// The app's normal dark and light styles (the Standard theme).
     pub base_styles: (egui::Style, egui::Style),
     pub theme_tex: crate::themes::Textures,
+    pub sound: Sound,
+    /// The theme's start-up screen, while it's showing.
+    pub boot: Option<themes::Boot>,
     pub settings: Settings,
     pub lib: Option<Library>,
     pub data: LibData,
@@ -111,6 +117,8 @@ impl RomApp {
         let mut app = RomApp {
             base_styles,
             theme_tex: Default::default(),
+            sound: Sound::default(),
+            boot: None,
             settings,
             lib: None,
             data: LibData::default(),
@@ -132,6 +140,10 @@ impl RomApp {
             if Library::is_library(&p) {
                 app.open_library(p);
             }
+        }
+        if app.settings.boot_screen {
+            let roms = app.data.stats.values().map(|s| s.count).sum();
+            app.boot = themes::Boot::new(app.settings.theme, roms, app.data.stats.len());
         }
         app
     }
@@ -190,6 +202,15 @@ impl RomApp {
 
     pub fn notify_err(&mut self, msg: impl Into<String>) {
         self.notice = Some((msg.into(), true));
+        self.sfx(Sfx::Error);
+    }
+
+    /// Play a sound effect, if sounds are switched on.
+    pub fn sfx(&mut self, sfx: Sfx) {
+        if self.settings.sounds {
+            self.sound
+                .play(sfx, self.settings.theme, self.settings.volume);
+        }
     }
 
     pub fn busy(&self) -> bool {
@@ -207,6 +228,9 @@ impl RomApp {
         }
         let out = job.take_output();
         self.job = None;
+        if !matches!(out, Some(JobOutput::Error(_))) {
+            self.sfx(Sfx::Done);
+        }
         match out {
             Some(JobOutput::Import { report, dry_run }) => {
                 if !dry_run {
@@ -285,22 +309,28 @@ impl RomApp {
         ui.add_space(14.0);
         ui.horizontal(|ui| {
             ui.add_space(6.0);
-            ui.label(RichText::new("🎮").size(22.0));
-            ui.label(crate::themes::head("Tabularium", 19.0).strong());
+            if themes::has_pixel_icons() {
+                let (r, _) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), egui::Sense::hover());
+                let col = ui.visuals().strong_text_color();
+                themes::paint_icon(ui.painter(), r, Icon::Logo, col);
+            } else {
+                ui.label(RichText::new("🎮").size(22.0));
+            }
+            ui.label(themes::head("Tabularium", 19.0).strong());
         });
         ui.add_space(14.0);
         for p in Page::ALL {
-            let selected = self.page == p;
-            let resp = ui.add(
-                egui::Button::selectable(
-                    selected,
-                    RichText::new(p.label()).size(crate::themes::fs(15.0)),
-                )
-                .min_size(egui::vec2(ui.available_width(), 32.0)),
-            );
-            if resp.clicked() {
+            let (icon, emoji, name) = p.label();
+            if themes::nav_item(ui, self.page == p, icon, emoji, name).clicked() && self.page != p {
                 self.page = p;
+                self.sfx(Sfx::Click);
             }
+        }
+        // Line art in the empty space above the library footer.
+        let rest = ui.available_rect_before_wrap();
+        let footer = if self.lib.is_some() { 56.0 } else { 8.0 };
+        if rest.height() > footer + 80.0 {
+            themes::paint_side_art(ui.painter(), rest.with_max_y(rest.bottom() - footer));
         }
         ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
             ui.add_space(8.0);
@@ -365,7 +395,22 @@ impl RomApp {
                 });
             });
         } else {
-            ui.label(RichText::new(crate::themes::ready_text()).weak());
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(themes::ready_text()).weak());
+                if self.settings.animations {
+                    if let Some(lit) = themes::cursor_lit(ui.ctx()) {
+                        let h = ui.text_style_height(&egui::TextStyle::Body);
+                        let (r, _) = ui.allocate_exact_size(
+                            egui::vec2(h * 0.55, h * 0.9),
+                            egui::Sense::hover(),
+                        );
+                        if lit {
+                            ui.painter()
+                                .rect_filled(r, 0, ui.visuals().weak_text_color());
+                        }
+                    }
+                }
+            });
         }
         ui.add_space(4.0);
     }
@@ -648,6 +693,16 @@ impl eframe::App for RomApp {
             }
         });
         self.empty_trash_dialog(ui);
+        if self.settings.animations {
+            themes::paint_motion(ui.ctx(), self.settings.crt_effect);
+        }
+        if let Some(boot) = &mut self.boot {
+            match boot.show(ui.ctx()) {
+                themes::BootStep::Running => {}
+                themes::BootStep::Jingle => self.sfx(Sfx::Boot),
+                themes::BootStep::Finished => self.boot = None,
+            }
+        }
         crate::themes::paint_overlay(
             ui.ctx(),
             &mut self.theme_tex,

@@ -1,4 +1,5 @@
 use crate::app::RomApp;
+use crate::sound::Sfx;
 use crate::themes::{self, ThemeId};
 use crate::widgets::{card, page_title, section};
 use egui::{RichText, Ui};
@@ -77,6 +78,7 @@ impl RomApp {
             (self.settings.crt_effect, self.settings.lcd_effect) = themes::default_effects(id);
             themes::apply(ui.ctx(), id, &self.base_styles);
             self.view.invalidate();
+            self.sfx(Sfx::Select);
         }
 
         ui.add_space(16.0);
@@ -94,6 +96,37 @@ impl RomApp {
                 .on_hover_text(
                 "Red-green-blue subpixel stripes, gaps between pixel rows and a faint glass glare.",
             );
+        });
+
+        ui.add_space(12.0);
+        card(ui, |ui| {
+            section(ui, "Motion and sound");
+            ui.checkbox(&mut self.settings.animations, "Animations")
+                .on_hover_text(
+                    "Blinking cursors, the CRT's rolling band and the Cyberpunk scanner sweep.",
+                );
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut self.settings.boot_screen, "Start-up screen")
+                    .on_hover_text("A short intro in the theme's style when Tabularium opens. Click or press a key to skip it.");
+                if ui.button("Play it now").clicked() {
+                    let roms = self.data.stats.values().map(|s| s.count).sum();
+                    self.boot = themes::Boot::new(self.settings.theme, roms, self.data.stats.len());
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut self.settings.sounds, "Sound effects")
+                    .on_hover_text("Chiptune blips in the theme's voice when you change page, pick something, finish a job or hit an error.");
+                ui.add_enabled_ui(self.settings.sounds, |ui| {
+                    ui.add(
+                        egui::Slider::new(&mut self.settings.volume, 0.0..=1.0)
+                            .show_value(false)
+                            .text("Volume"),
+                    );
+                    if ui.button("Test").clicked() {
+                        self.sfx(Sfx::Boot);
+                    }
+                });
+            });
         });
     }
 }

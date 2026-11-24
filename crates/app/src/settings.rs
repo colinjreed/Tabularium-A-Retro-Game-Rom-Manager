@@ -23,6 +23,14 @@ pub struct Settings {
     /// Screen effects, usable with any theme.
     pub crt_effect: bool,
     pub lcd_effect: bool,
+    /// Blinking cursors, CRT roll and HUD sweeps.
+    pub animations: bool,
+    /// The theme's start-up screen.
+    pub boot_screen: bool,
+    /// Chiptune blips for clicks, finished jobs and errors.
+    pub sounds: bool,
+    /// 0.0..=1.0
+    pub volume: f32,
 }
 
 impl Default for Settings {
@@ -38,6 +46,10 @@ impl Default for Settings {
             theme: Default::default(),
             crt_effect: false,
             lcd_effect: false,
+            animations: true,
+            boot_screen: true,
+            sounds: false,
+            volume: 0.5,
         }
     }
 }

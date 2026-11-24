@@ -257,7 +257,9 @@ made with the earlier command-line (Python) version open unchanged.
 
 ## Building from source
 
-Requires Rust 1.95 or newer (`rustup update`).
+Requires Rust 1.95 or newer (`rustup update`). On Linux, building also needs
+the ALSA headers for sound effects (`sudo apt install libasound2-dev` on
+Debian/Ubuntu, `alsa-lib-devel` on Fedora).
 
 ```sh
 cargo run --release          # run the app
@@ -271,7 +273,7 @@ The workspace has two crates:
 * `crates/app`: the desktop UI, built with [egui](https://github.com/emilk/egui).
 
 On Linux the app needs the usual desktop libraries at runtime (X11 or
-Wayland, `libxkbcommon-x11`, OpenGL), which every desktop distribution
+Wayland, `libxkbcommon-x11`, OpenGL, ALSA), which every desktop distribution
 already has. File dialogs use the XDG desktop portal. If yours has none,
 type paths into the boxes next to each *Choose…* button.
 
