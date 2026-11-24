@@ -3950,6 +3950,7 @@ dependencies = [
  "image",
  "md-5",
  "percent-encoding",
+ "rayon",
  "regex",
  "rusqlite",
  "serde",

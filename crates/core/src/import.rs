@@ -1,6 +1,6 @@
 //! Sort ROMs from arbitrary folders into the library.
 
-use crate::detect::{scan, RomSet};
+use crate::detect::{scan_with_progress, RomSet};
 use crate::library::{AddOutcome, Library};
 use crate::progress::Reporter;
 use crate::systems::System;
@@ -50,8 +50,17 @@ pub fn import(
 ) -> Result<ImportReport> {
     let mut out = ImportReport::default();
     rep.progress(0, 0, "Scanning folders…");
-    let mut found = scan(sources, opts.forced_system, &|| rep.cancelled());
+    let mut found = scan_with_progress(
+        sources,
+        opts.forced_system,
+        &|| rep.cancelled(),
+        &|d, t, what| rep.progress(d, t, what),
+    );
     recognise_arcade_zips(lib, &mut found.sets, opts, rep);
+    if checksum_all(&mut found.sets, rep) {
+        out.cancelled = true;
+        return Ok(out);
+    }
     if opts.official_names || opts.strip_numbers {
         let mut dats = match (&opts.fetch, opts.official_names) {
             (Some(f), true) => Some(crate::dats::Dats::new(
@@ -109,6 +118,41 @@ pub fn import(
     }
     rep.progress(total, total, "Done");
     Ok(out)
+}
+
+/// Work out every identified file's checksum (for duplicate checks and
+/// official names) in one pass, so nothing is read twice. Small files are
+/// read several at a time; big ones one after another, which keeps a hard
+/// drive from seeking back and forth. Returns true if cancelled.
+fn checksum_all(sets: &mut [RomSet], rep: &dyn Reporter) -> bool {
+    use rayon::prelude::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    const BIG: u64 = 64 << 20;
+    let is_big = |rs: &RomSet| {
+        rs.main.is_dir()
+            || (crate::detect::ext_of(&rs.main) != "zip"
+                && std::fs::metadata(&rs.main).map(|m| m.len()).unwrap_or(0) >= BIG)
+    };
+    let total = sets.iter().filter(|rs| rs.system.is_some()).count();
+    let done = AtomicUsize::new(0);
+    let one = |rs: &mut RomSet| {
+        if rep.cancelled() {
+            return;
+        }
+        rs.crc = crate::hashing::content_crc(&rs.main).ok();
+        let n = done.fetch_add(1, Ordering::Relaxed) + 1;
+        let name = rs.main.file_name().unwrap_or_default().to_string_lossy();
+        rep.progress(n, total, &format!("Checking {name}"));
+    };
+    let (big, small): (Vec<&mut RomSet>, Vec<&mut RomSet>) = sets
+        .iter_mut()
+        .filter(|rs| rs.system.is_some())
+        .partition(|rs| is_big(rs));
+    small.into_par_iter().for_each(one);
+    for rs in big {
+        one(rs);
+    }
+    rep.cancelled()
 }
 
 /// Zips nothing else could place: if the file name is a known MAME/FBNeo

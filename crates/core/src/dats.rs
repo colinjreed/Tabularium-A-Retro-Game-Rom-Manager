@@ -75,6 +75,11 @@ impl Dats {
         }
     }
 
+    /// Whether this system's list has been loaded (or found missing) already.
+    pub fn is_loaded(&self, system: &str) -> bool {
+        self.loaded.contains_key(system)
+    }
+
     pub fn get(&mut self, system: &str) -> Option<&HashMap<String, String>> {
         if !self.loaded.contains_key(system) {
             let m = self.load(system);

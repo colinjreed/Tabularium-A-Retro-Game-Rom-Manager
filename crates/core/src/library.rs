@@ -558,7 +558,10 @@ impl Library {
         let sys = rs
             .system
             .ok_or_else(|| Error::Other("ROM has no system".into()))?;
-        let (crc, csize) = content_crc(&rs.main)?;
+        let (crc, csize) = match &rs.crc {
+            Some(c) => c.clone(),
+            None => content_crc(&rs.main)?,
+        };
         if let Some(existing) = self.find_by_crc(sys.id, &crc, csize)? {
             return Ok(AddOutcome::Duplicate(existing.path));
         }
