@@ -45,15 +45,26 @@ pub fn plan_import(
         if rep.cancelled() {
             return;
         }
+        if i % 50 == 0 {
+            rep.progress(i, total, "Looking up official names…");
+        }
         let Some(sys) = rs.system else { continue };
         if !eligible(sys.id) || !rs.companions.is_empty() || !rs.main.is_file() {
             continue;
         }
-        if i % 50 == 0 {
-            rep.progress(i, total, "Looking up official names…");
-        }
         if let Some(d) = dats.as_deref_mut() {
-            if let Ok((crc, _)) = content_crc(&rs.main) {
+            if !d.is_loaded(sys.id) {
+                rep.progress(
+                    i,
+                    total,
+                    &format!("Getting the official name list for {}…", sys.display_name()),
+                );
+            }
+            let crc = match &rs.crc {
+                Some((c, _)) => Some(c.clone()),
+                None => content_crc(&rs.main).ok().map(|c| c.0),
+            };
+            if let Some(crc) = crc {
                 let crcs = dats::candidate_crcs(&rs.main, &crc);
                 let hint = detect::folder_hint(&rs.main, None).map(|h| h.id);
                 if let Some((sys_id, name)) = d.identify(&crcs, sys.id, hint) {

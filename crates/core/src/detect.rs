@@ -28,6 +28,9 @@ pub struct RomSet {
     pub companions: Vec<PathBuf>,
     pub system: Option<&'static System>,
     pub reason: String,
+    /// Content CRC and size, once worked out (see `import`), so files are
+    /// only read once.
+    pub crc: Option<(String, u64)>,
 }
 
 impl RomSet {
@@ -352,6 +355,7 @@ pub fn detect(path: &Path, root: Option<&Path>, forced: Option<&'static System>)
         .filter(|p| p.exists() && p != path)
         .collect();
     let mut rs = RomSet {
+        crc: None,
         rename: None,
         main: path.to_path_buf(),
         companions,
@@ -486,8 +490,20 @@ pub struct ScanResult {
 pub fn scan(
     paths: &[PathBuf],
     forced: Option<&'static System>,
-    cancel: &dyn Fn() -> bool,
+    cancel: &(dyn Fn() -> bool + Sync),
 ) -> ScanResult {
+    scan_with_progress(paths, forced, cancel, &|_, _, _| {})
+}
+
+/// [`scan`], reporting (done, total, what) as it goes. `total` is 0 while
+/// still walking the folders.
+pub fn scan_with_progress(
+    paths: &[PathBuf],
+    forced: Option<&'static System>,
+    cancel: &(dyn Fn() -> bool + Sync),
+    progress: &(dyn Fn(usize, usize, &str) + Sync),
+) -> ScanResult {
+    use rayon::prelude::*;
     let mut candidates: Vec<(PathBuf, PathBuf)> = vec![];
     let mut folder_games: Vec<(PathBuf, &'static System)> = vec![];
     for root in paths {
@@ -509,6 +525,16 @@ pub fn scan(
                 }
             } else if entry.file_type().is_file() {
                 candidates.push((entry.path().to_path_buf(), root.clone()));
+                if candidates.len().is_multiple_of(500) {
+                    progress(
+                        0,
+                        0,
+                        &format!("Scanning folders… {} files found", candidates.len()),
+                    );
+                    if cancel() {
+                        return ScanResult::default();
+                    }
+                }
             }
         }
         if cancel() {
@@ -540,6 +566,7 @@ pub fn scan(
     for (dir, sys) in folder_games {
         let system = forced.or(Some(sys));
         out.sets.push(RomSet {
+            crc: None,
             rename: None,
             main: dir,
             companions: vec![],
@@ -547,6 +574,7 @@ pub fn scan(
             reason: "game folder".into(),
         });
     }
+    let mut todo = vec![];
     for (p, root) in candidates {
         if claimed.contains(&p) {
             continue;
@@ -555,7 +583,29 @@ pub fn scan(
             out.skipped.push(p);
             continue;
         }
-        out.sets.push(detect(&p, Some(&root), forced));
+        todo.push((p, root));
     }
+    // Identifying a file means opening it (zip directories, disc headers),
+    // so do several at once; slow drives and network shares benefit most.
+    let total = todo.len();
+    let done = std::sync::atomic::AtomicUsize::new(0);
+    let detected: Vec<Option<RomSet>> = todo
+        .par_iter()
+        .map(|(p, root)| {
+            if cancel() {
+                return None;
+            }
+            let rs = detect(p, Some(root), forced);
+            let n = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+            if n.is_multiple_of(50) || n == total {
+                progress(n, total, "Identifying files…");
+            }
+            Some(rs)
+        })
+        .collect();
+    if cancel() {
+        return ScanResult::default();
+    }
+    out.sets.extend(detected.into_iter().flatten());
     out
 }
