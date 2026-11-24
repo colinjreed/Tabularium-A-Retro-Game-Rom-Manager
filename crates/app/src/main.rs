@@ -5,7 +5,6 @@ mod app;
 mod jobs;
 mod pages;
 mod settings;
-mod sound;
 mod themes;
 mod widgets;
 

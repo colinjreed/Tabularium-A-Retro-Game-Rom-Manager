@@ -655,13 +655,10 @@ pub struct Boot {
     id: ThemeId,
     roms: u64,
     systems: usize,
-    jingle_played: bool,
 }
 
 pub enum BootStep {
     Running,
-    /// Running, and the jingle should start now.
-    Jingle,
     Finished,
 }
 
@@ -675,17 +672,7 @@ impl Boot {
             id,
             roms,
             systems,
-            jingle_played: false,
         })
-    }
-
-    fn jingle_at(&self) -> f32 {
-        match self.id {
-            ThemeId::GameBoy => 1.3,
-            ThemeId::AtomicPurple => 0.95,
-            ThemeId::VirtualBoy => 1.2,
-            _ => 0.15,
-        }
     }
 
     /// Draw the start-up screen. Clicking or pressing a key skips it.
@@ -715,10 +702,6 @@ impl Boot {
                 self.draw(&painter, rect, &t, el);
             });
         ctx.request_repaint();
-        if !self.jingle_played && el >= self.jingle_at() {
-            self.jingle_played = true;
-            return BootStep::Jingle;
-        }
         BootStep::Running
     }
 

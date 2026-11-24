@@ -3,7 +3,6 @@
 use crate::jobs::{Job, JobOutput};
 use crate::pages;
 use crate::settings::Settings;
-use crate::sound::{Sfx, Sound};
 use crate::themes::{self, Icon};
 use crate::widgets;
 use egui::{Color32, RichText, Ui};
@@ -72,7 +71,6 @@ pub struct RomApp {
     /// The app's normal dark and light styles (the Standard theme).
     pub base_styles: (egui::Style, egui::Style),
     pub theme_tex: crate::themes::Textures,
-    pub sound: Sound,
     /// The theme's start-up screen, while it's showing.
     pub boot: Option<themes::Boot>,
     pub settings: Settings,
@@ -117,7 +115,6 @@ impl RomApp {
         let mut app = RomApp {
             base_styles,
             theme_tex: Default::default(),
-            sound: Sound::default(),
             boot: None,
             settings,
             lib: None,
@@ -202,17 +199,7 @@ impl RomApp {
 
     pub fn notify_err(&mut self, msg: impl Into<String>) {
         self.notice = Some((msg.into(), true));
-        self.sfx(Sfx::Error);
     }
-
-    /// Play a sound effect, if sounds are switched on.
-    pub fn sfx(&mut self, sfx: Sfx) {
-        if self.settings.sounds {
-            self.sound
-                .play(sfx, self.settings.theme, self.settings.volume);
-        }
-    }
-
     pub fn busy(&self) -> bool {
         self.job.is_some()
     }
@@ -228,9 +215,6 @@ impl RomApp {
         }
         let out = job.take_output();
         self.job = None;
-        if !matches!(out, Some(JobOutput::Error(_))) {
-            self.sfx(Sfx::Done);
-        }
         match out {
             Some(JobOutput::Import { report, dry_run }) => {
                 if !dry_run {
@@ -321,9 +305,8 @@ impl RomApp {
         ui.add_space(14.0);
         for p in Page::ALL {
             let (icon, emoji, name) = p.label();
-            if themes::nav_item(ui, self.page == p, icon, emoji, name).clicked() && self.page != p {
+            if themes::nav_item(ui, self.page == p, icon, emoji, name).clicked() {
                 self.page = p;
-                self.sfx(Sfx::Click);
             }
         }
         // Line art in the empty space above the library footer.
@@ -699,7 +682,6 @@ impl eframe::App for RomApp {
         if let Some(boot) = &mut self.boot {
             match boot.show(ui.ctx()) {
                 themes::BootStep::Running => {}
-                themes::BootStep::Jingle => self.sfx(Sfx::Boot),
                 themes::BootStep::Finished => self.boot = None,
             }
         }

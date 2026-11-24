@@ -27,10 +27,6 @@ pub struct Settings {
     pub animations: bool,
     /// The theme's start-up screen.
     pub boot_screen: bool,
-    /// Chiptune blips for clicks, finished jobs and errors.
-    pub sounds: bool,
-    /// 0.0..=1.0
-    pub volume: f32,
 }
 
 impl Default for Settings {
@@ -48,8 +44,6 @@ impl Default for Settings {
             lcd_effect: false,
             animations: true,
             boot_screen: true,
-            sounds: false,
-            volume: 0.5,
         }
     }
 }
