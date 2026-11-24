@@ -57,9 +57,12 @@ pub struct LibraryView {
     pub tag: Option<String>,
     pub played: PlayedFilter,
     anchor: Option<usize>,
+    /// The row the keyboard is on (moves with the arrow keys).
+    cursor: Option<usize>,
     filtered: Vec<usize>,
     key: Option<FilterKey>,
-    scroll_to: Option<usize>,
+    /// Row to scroll to, and where to put it (None: just bring it into view).
+    scroll_to: Option<(usize, Option<egui::Align>)>,
     new_tag: String,
     genre_text: Option<(i64, String)>,
 }
@@ -301,6 +304,7 @@ impl RomApp {
             .collect();
         self.view.key = Some(key);
         self.view.anchor = None;
+        self.view.cursor = None;
     }
 
     fn surprise_me(&mut self) {
@@ -322,7 +326,8 @@ impl RomApp {
         let rom = &self.data.roms[rows[row]];
         self.view.selected = BTreeSet::from([rom.id]);
         self.view.anchor = Some(row);
-        self.view.scroll_to = Some(row);
+        self.view.cursor = Some(row);
+        self.view.scroll_to = Some((row, Some(egui::Align::Center)));
         self.notify(format!("How about {}?", rom.display_name()));
     }
 
@@ -334,7 +339,7 @@ impl RomApp {
             format!("{} ROMs · {n_sel} selected", self.view.filtered.len())
         } else {
             format!(
-                "{} ROMs · Ctrl/⌘-click or Shift-click to select several",
+                "{} ROMs · arrow keys to move · Ctrl/⌘-click or Shift-click to select several",
                 self.view.filtered.len()
             )
         };
@@ -343,6 +348,8 @@ impl RomApp {
         let rows = self.view.filtered.clone();
         let mut clicked: Option<usize> = None;
         let text_h = ui.text_style_height(&egui::TextStyle::Body) + 6.0;
+        let page = ((ui.available_height() - 22.0) / text_h).floor().max(1.0) as usize;
+        self.keyboard_nav(ui, rows.len(), page);
         let mut table = egui_extras::TableBuilder::new(ui)
             .striped(true)
             .sense(egui::Sense::click())
@@ -369,8 +376,8 @@ impl RomApp {
             )
             .column(egui_extras::Column::exact(28.0))
             .column(egui_extras::Column::exact(28.0));
-        if let Some(r) = self.view.scroll_to.take() {
-            table = table.scroll_to_row(r, Some(egui::Align::Center));
+        if let Some((r, align)) = self.view.scroll_to.take() {
+            table = table.scroll_to_row(r, align);
         }
         table
             .header(22.0, |mut h| {
@@ -452,6 +459,64 @@ impl RomApp {
         }
     }
 
+    /// Arrow keys, Page Up/Down and Home/End move the selection; with Shift
+    /// they extend it. Ignored while typing in a text box.
+    fn keyboard_nav(&mut self, ui: &Ui, n: usize, page: usize) {
+        if n == 0 || ui.ctx().egui_wants_keyboard_input() {
+            return;
+        }
+        let far = n as isize;
+        let page = page as isize;
+        let (step, shift) = ui.input_mut(|i| {
+            let mut step = None;
+            for (mods, key, d) in [
+                (egui::Modifiers::COMMAND, egui::Key::ArrowUp, -far),
+                (egui::Modifiers::COMMAND, egui::Key::ArrowDown, far),
+                (egui::Modifiers::NONE, egui::Key::ArrowUp, -1),
+                (egui::Modifiers::NONE, egui::Key::ArrowDown, 1),
+                (egui::Modifiers::NONE, egui::Key::PageUp, -page),
+                (egui::Modifiers::NONE, egui::Key::PageDown, page),
+                (egui::Modifiers::NONE, egui::Key::Home, -far),
+                (egui::Modifiers::NONE, egui::Key::End, far),
+            ] {
+                if i.consume_key(mods, key) {
+                    step = Some(d);
+                }
+            }
+            (step, i.modifiers.shift)
+        });
+        let Some(d) = step else { return };
+        let cur = self.view.cursor.or(self.view.anchor).filter(|&c| c < n);
+        let new = match cur {
+            None if d > 0 => 0,
+            None => n - 1,
+            Some(c) => (c as isize + d).clamp(0, n as isize - 1) as usize,
+        };
+        if shift {
+            let a = self
+                .view
+                .anchor
+                .filter(|&a| a < n)
+                .unwrap_or(cur.unwrap_or(new));
+            self.view.anchor = Some(a);
+            self.view.selected = (a.min(new)..=a.max(new)).map(|i| self.row_id(i)).collect();
+        } else {
+            self.view.selected = BTreeSet::from([self.row_id(new)]);
+            self.view.anchor = Some(new);
+        }
+        self.view.cursor = Some(new);
+        self.view.scroll_to = Some((new, None));
+    }
+
+    fn row_id(&self, i: usize) -> i64 {
+        let list = if self.view.show_trash {
+            &self.data.trashed
+        } else {
+            &self.data.roms
+        };
+        list[self.view.filtered[i]].id
+    }
+
     fn click_row(&mut self, ui: &Ui, idx: usize) {
         let m = ui.input(|i| i.modifiers);
         let list = if self.view.show_trash {
@@ -470,6 +535,7 @@ impl RomApp {
             for i in lo..=hi {
                 self.view.selected.insert(id_at(i));
             }
+            self.view.cursor = Some(idx);
             return;
         }
         if m.command {
@@ -482,6 +548,7 @@ impl RomApp {
             self.view.selected = BTreeSet::from([id]);
         }
         self.view.anchor = Some(idx);
+        self.view.cursor = Some(idx);
     }
 
     // ------------------------------------------------------------------ actions
