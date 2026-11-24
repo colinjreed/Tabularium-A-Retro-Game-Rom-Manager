@@ -5,6 +5,7 @@ mod app;
 mod jobs;
 mod pages;
 mod settings;
+mod themes;
 mod widgets;
 
 fn icon() -> Option<egui::IconData> {

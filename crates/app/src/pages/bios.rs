@@ -38,7 +38,7 @@ fn status_list(ui: &mut Ui, _id: &str, statuses: &[ReqStatus]) {
         };
         ui.add_space(4.0);
         ui.horizontal(|ui| {
-            ui.colored_label(color, RichText::new(icon).size(15.0));
+            ui.colored_label(color, RichText::new(icon).size(crate::themes::fs(15.0)));
             ui.label(RichText::new(systems::name_of(rs.req.system)).strong());
             let kind = if rs.req.required {
                 "required"

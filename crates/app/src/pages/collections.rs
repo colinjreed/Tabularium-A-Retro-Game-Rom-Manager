@@ -380,7 +380,9 @@ impl RomApp {
             changed |= ui
                 .checkbox(
                     &mut col.use_rules,
-                    RichText::new("Also add games by rules").strong().size(15.0),
+                    RichText::new("Also add games by rules")
+                        .strong()
+                        .size(crate::themes::fs(15.0)),
                 )
                 .on_hover_text(
                     "Untick for a card that holds only your hand-picked games (a mixtape).",
@@ -488,7 +490,11 @@ impl RomApp {
         };
         let profile = col.profile();
         ui.add_space(6.0);
-        ui.label(RichText::new("What goes on the card").strong().size(16.0));
+        ui.label(
+            RichText::new("What goes on the card")
+                .strong()
+                .size(crate::themes::fs(16.0)),
+        );
         let Some(sel) = &self.cards.preview else {
             ui.spinner();
             return;
@@ -550,7 +556,11 @@ impl RomApp {
         );
 
         ui.add_space(12.0);
-        ui.label(RichText::new("Copy to SD card").strong().size(16.0));
+        ui.label(
+            RichText::new("Copy to SD card")
+                .strong()
+                .size(crate::themes::fs(16.0)),
+        );
         ui.label(RichText::new(profile.label).weak());
         let dest_text = self
             .cards

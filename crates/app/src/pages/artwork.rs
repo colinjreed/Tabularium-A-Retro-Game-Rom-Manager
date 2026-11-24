@@ -162,7 +162,7 @@ impl RomApp {
                         r.found, r.missing, r.skipped
                     ))
                     .strong()
-                    .size(15.0),
+                    .size(crate::themes::fs(15.0)),
                 );
                 if let Some(s) = &r.stopped {
                     ui.colored_label(widgets::err_color(ui), format!("Stopped: {s}"));

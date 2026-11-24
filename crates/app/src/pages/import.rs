@@ -197,7 +197,7 @@ fn import_results(ui: &mut Ui, rep: &ImportReport, dry: bool) {
         rep.duplicates.len(),
         rep.unknown.len()
     );
-    ui.label(RichText::new(head).strong().size(15.0));
+    ui.label(RichText::new(head).strong().size(crate::themes::fs(15.0)));
     if rep.cancelled {
         ui.colored_label(widgets::warn_color(ui), "Stopped before finishing.");
     }

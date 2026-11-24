@@ -19,6 +19,10 @@ pub struct Settings {
     pub last_card_folder: Option<PathBuf>,
     /// Show Super Famicom / Mega Drive style names instead of US ones.
     pub system_names: tabularium_core::systems::NameRegion,
+    pub theme: crate::themes::ThemeId,
+    /// Screen effects, usable with any theme.
+    pub crt_effect: bool,
+    pub lcd_effect: bool,
 }
 
 impl Default for Settings {
@@ -31,6 +35,9 @@ impl Default for Settings {
             match_cutoff: 0.92,
             last_card_folder: None,
             system_names: Default::default(),
+            theme: Default::default(),
+            crt_effect: false,
+            lcd_effect: false,
         }
     }
 }

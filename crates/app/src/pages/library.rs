@@ -625,7 +625,7 @@ impl RomApp {
             ui.label(
                 RichText::new(format!("{} games selected", roms.len()))
                     .strong()
-                    .size(17.0),
+                    .size(crate::themes::fs(17.0)),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                 if ui
@@ -684,7 +684,14 @@ impl RomApp {
     fn rom_detail(&mut self, ui: &mut Ui, rom: &Rom) {
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            ui.add(egui::Label::new(RichText::new(rom.display_name()).strong().size(17.0)).wrap());
+            ui.add(
+                egui::Label::new(
+                    RichText::new(rom.display_name())
+                        .strong()
+                        .size(crate::themes::fs(17.0)),
+                )
+                .wrap(),
+            );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
                 if ui.small_button("×").clicked() {
                     self.view.selected.clear();

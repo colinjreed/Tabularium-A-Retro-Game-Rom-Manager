@@ -97,7 +97,7 @@ impl RomApp {
             ui.label(
                 RichText::new(format!("{} name(s) to fix", rep.changes.len()))
                     .strong()
-                    .size(15.0),
+                    .size(crate::themes::fs(15.0)),
             );
             if moved > 0 {
                 ui.label(format!("{moved} of them move to a different system"));
@@ -161,7 +161,7 @@ impl RomApp {
                 human_size(bytes)
             ))
             .strong()
-            .size(15.0),
+            .size(crate::themes::fs(15.0)),
         );
         let mut by_reason: BTreeMap<String, usize> = BTreeMap::new();
         for r in results {

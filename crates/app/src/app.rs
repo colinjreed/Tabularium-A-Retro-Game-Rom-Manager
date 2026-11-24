@@ -18,17 +18,19 @@ pub enum Page {
     Artwork,
     Bios,
     Collections,
+    Themes,
     Settings,
 }
 
 impl Page {
-    const ALL: [Page; 7] = [
+    const ALL: [Page; 8] = [
         Page::Library,
         Page::Import,
         Page::Clean,
         Page::Artwork,
         Page::Bios,
         Page::Collections,
+        Page::Themes,
         Page::Settings,
     ];
 
@@ -40,6 +42,7 @@ impl Page {
             Page::Artwork => "🖼  Artwork",
             Page::Bios => "🔑  BIOS",
             Page::Collections => "💾  SD cards",
+            Page::Themes => "🎨  Themes",
             Page::Settings => "⚙  Settings",
         }
     }
@@ -63,6 +66,9 @@ pub struct LibData {
 pub use crate::pages::library::LibraryView;
 
 pub struct RomApp {
+    /// The app's normal dark and light styles (the Standard theme).
+    pub base_styles: (egui::Style, egui::Style),
+    pub theme_tex: crate::themes::Textures,
     pub settings: Settings,
     pub lib: Option<Library>,
     pub data: LibData,
@@ -86,11 +92,25 @@ impl RomApp {
         style.spacing.button_padding = egui::vec2(10.0, 4.0);
         style.interaction.selectable_labels = false;
         cc.egui_ctx.set_global_style(style);
+        crate::themes::install_fonts(&cc.egui_ctx);
+        let tweak = |mut st: egui::Style| {
+            st.spacing.item_spacing = egui::vec2(8.0, 6.0);
+            st.spacing.button_padding = egui::vec2(10.0, 4.0);
+            st.interaction.selectable_labels = false;
+            st
+        };
+        let base_styles = (
+            tweak((*cc.egui_ctx.style_of(egui::Theme::Dark)).clone()),
+            tweak((*cc.egui_ctx.style_of(egui::Theme::Light)).clone()),
+        );
 
         let mut settings = Settings::load(cc.storage);
         tabularium_core::systems::set_name_region(settings.system_names);
         settings.screenscraper = settings.screenscraper.clone().with_env_fallback();
+        crate::themes::apply(&cc.egui_ctx, settings.theme, &base_styles);
         let mut app = RomApp {
+            base_styles,
+            theme_tex: Default::default(),
             settings,
             lib: None,
             data: LibData::default(),
@@ -266,14 +286,17 @@ impl RomApp {
         ui.horizontal(|ui| {
             ui.add_space(6.0);
             ui.label(RichText::new("🎮").size(22.0));
-            ui.label(RichText::new("Tabularium").size(19.0).strong());
+            ui.label(crate::themes::head("Tabularium", 19.0).strong());
         });
         ui.add_space(14.0);
         for p in Page::ALL {
             let selected = self.page == p;
             let resp = ui.add(
-                egui::Button::selectable(selected, RichText::new(p.label()).size(15.0))
-                    .min_size(egui::vec2(ui.available_width(), 32.0)),
+                egui::Button::selectable(
+                    selected,
+                    RichText::new(p.label()).size(crate::themes::fs(15.0)),
+                )
+                .min_size(egui::vec2(ui.available_width(), 32.0)),
             );
             if resp.clicked() {
                 self.page = p;
@@ -342,7 +365,7 @@ impl RomApp {
                 });
             });
         } else {
-            ui.label(RichText::new("Ready").weak());
+            ui.label(RichText::new(crate::themes::ready_text()).weak());
         }
         ui.add_space(4.0);
     }
@@ -351,7 +374,7 @@ impl RomApp {
         ui.vertical_centered(|ui| {
             ui.add_space(50.0);
             ui.label(RichText::new("🎮").size(56.0));
-            ui.heading(RichText::new("Welcome to Tabularium").size(26.0).strong());
+            ui.heading(crate::themes::head("Welcome to Tabularium", 26.0).strong());
             ui.add_space(6.0);
             ui.label(
                 "Organise your ROMs into one library, clean out duplicates, fetch artwork, \
@@ -361,7 +384,11 @@ impl RomApp {
         });
         ui.columns(2, |cols| {
             widgets::card(&mut cols[0], |ui| {
-                ui.label(RichText::new("Start a new library").strong().size(16.0));
+                ui.label(
+                    RichText::new("Start a new library")
+                        .strong()
+                        .size(crate::themes::fs(16.0)),
+                );
                 ui.label(
                     "Pick a folder with plenty of space. ROMs you import are copied into it, \
                           sorted by system.",
@@ -392,7 +419,7 @@ impl RomApp {
                 ui.label(
                     RichText::new("Open an existing library")
                         .strong()
-                        .size(16.0),
+                        .size(crate::themes::fs(16.0)),
                 );
                 ui.label(
                     "A folder containing library.db (libraries from the earlier command-line \
@@ -571,12 +598,24 @@ impl RomApp {
 impl eframe::App for RomApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         self.poll_job();
-        egui::Panel::bottom("status").show(ui, |ui| self.status_bar(ui));
+        crate::themes::paint_background(ui.ctx(), &mut self.theme_tex);
+        egui::Panel::bottom("status").show(ui, |ui| {
+            crate::themes::paint_panel(ui, crate::themes::Area::Bar, &mut self.theme_tex);
+            self.status_bar(ui)
+        });
         egui::Panel::left("nav")
             .resizable(false)
             .exact_size(180.0)
-            .show(ui, |ui| self.nav(ui));
+            .show(ui, |ui| {
+                crate::themes::paint_panel(ui, crate::themes::Area::Side, &mut self.theme_tex);
+                self.nav(ui)
+            });
         egui::CentralPanel::default().show(ui, |ui| {
+            crate::themes::paint_panel(ui, crate::themes::Area::Main, &mut self.theme_tex);
+            if self.page == Page::Themes {
+                egui::ScrollArea::vertical().show(ui, |ui| self.themes_page(ui));
+                return;
+            }
             if self.lib.is_none() && self.page != Page::Settings {
                 egui::ScrollArea::vertical().show(ui, |ui| self.welcome(ui));
                 return;
@@ -600,6 +639,7 @@ impl eframe::App for RomApp {
                         .inner
                 }
                 Page::Collections => self.collections_page(ui),
+                Page::Themes => {}
                 Page::Settings => {
                     egui::ScrollArea::vertical()
                         .show(ui, |ui| self.settings_page(ui))
@@ -608,6 +648,12 @@ impl eframe::App for RomApp {
             }
         });
         self.empty_trash_dialog(ui);
+        crate::themes::paint_overlay(
+            ui.ctx(),
+            &mut self.theme_tex,
+            self.settings.crt_effect,
+            self.settings.lcd_effect,
+        );
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {

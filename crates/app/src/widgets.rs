@@ -9,16 +9,48 @@ use tabularium_core::systems;
 
 pub fn page_title(ui: &mut Ui, title: &str, subtitle: &str) {
     ui.add_space(4.0);
-    ui.heading(RichText::new(title).size(22.0).strong());
+    heading(ui, title, 22.0);
     if !subtitle.is_empty() {
         ui.label(RichText::new(subtitle).weak());
     }
     ui.add_space(8.0);
 }
 
+/// A heading in the theme's display font, with the theme's glow if it has one.
+pub fn heading(ui: &mut Ui, text: &str, size: f32) {
+    let rt = crate::themes::head(text, size).strong();
+    match crate::themes::glow() {
+        None => {
+            ui.label(rt);
+        }
+        Some((a, b)) => {
+            let galley = egui::WidgetText::from(rt).into_galley(
+                ui,
+                Some(egui::TextWrapMode::Extend),
+                f32::INFINITY,
+                egui::TextStyle::Heading,
+            );
+            let (rect, _) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
+            let color = ui.visuals().text_color();
+            let painter = ui.painter();
+            painter.galley_with_override_text_color(
+                rect.min + egui::vec2(2.0, 0.0),
+                galley.clone(),
+                a,
+            );
+            painter.galley_with_override_text_color(
+                rect.min - egui::vec2(2.0, 0.0),
+                galley.clone(),
+                b,
+            );
+            painter.galley(rect.min, galley, color);
+        }
+    }
+}
+
 pub fn section(ui: &mut Ui, title: &str) {
     ui.add_space(10.0);
-    ui.label(RichText::new(title).strong().size(15.0));
+    ui.label(crate::themes::head(title, 15.0).strong());
     ui.add_space(2.0);
 }
 
