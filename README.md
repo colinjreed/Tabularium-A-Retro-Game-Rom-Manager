@@ -33,7 +33,7 @@ Builds for every platform are produced by GitHub Actions:
 | Platform | File | Notes |
 |---|---|---|
 | Windows 10/11 | `tabularium-windows-x86_64.zip` | Unzip and run `Tabularium.exe`. The app isn't code-signed, so SmartScreen may warn: choose *More info → Run anyway*. |
-| macOS 11+ (Apple Silicon & Intel) *(paused: build by hand from the Actions tab)* | `tabularium-macos-universal.dmg` | Drag *Tabularium* to Applications. It isn't notarised: the first time, right-click the app → *Open* → *Open* (or allow it in System Settings → Privacy & Security). |
+| macOS 11+ (Apple Silicon & Intel) | `tabularium-macos-universal.dmg` | Drag *Tabularium* to Applications. It isn't notarised: the first time, right-click the app → *Open* → *Open* (or allow it in System Settings → Privacy & Security). |
 | Linux x86_64 | `Tabularium-x86_64.AppImage` | `chmod +x` it and run. Or use the `.tar.gz` and run `./install.sh` to add it to your applications menu. |
 
 ## How it works
