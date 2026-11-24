@@ -595,11 +595,13 @@ pub fn scan_with_progress(
             if cancel() {
                 return None;
             }
+            // Name the file before opening it, so a file that hangs (say, one
+            // macOS must first download from iCloud) is visible on screen.
+            let n = done.load(std::sync::atomic::Ordering::Relaxed);
+            let name = p.file_name().unwrap_or_default().to_string_lossy();
+            progress(n, total, &format!("Identifying {name}"));
             let rs = detect(p, Some(root), forced);
-            let n = done.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
-            if n.is_multiple_of(50) || n == total {
-                progress(n, total, "Identifying files…");
-            }
+            done.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             Some(rs)
         })
         .collect();
