@@ -45,8 +45,35 @@ impl Credentials {
         self
     }
 
+    /// Developer credentials built into this copy of Tabularium, if any.
+    ///
+    /// Release downloads get them from the `SCREENSCRAPER_DEVID` and
+    /// `SCREENSCRAPER_DEVPASSWORD` secrets at build time; they are never in
+    /// the source code. Builds without them ask for credentials in Settings.
+    pub fn builtin_dev() -> Option<(&'static str, &'static str)> {
+        match (
+            option_env!("SCREENSCRAPER_DEVID"),
+            option_env!("SCREENSCRAPER_DEVPASSWORD"),
+        ) {
+            (Some(id), Some(pw)) if !id.is_empty() && !pw.is_empty() => Some((id, pw)),
+            _ => None,
+        }
+    }
+
     pub fn has_dev(&self) -> bool {
-        !self.dev_id.is_empty() && !self.dev_password.is_empty()
+        (!self.dev_id.is_empty() && !self.dev_password.is_empty()) || Self::builtin_dev().is_some()
+    }
+
+    /// These credentials with the built-in developer ones filled in where the
+    /// user hasn't given their own.
+    fn effective(mut self) -> Self {
+        if self.dev_id.is_empty() || self.dev_password.is_empty() {
+            if let Some((id, pw)) = Self::builtin_dev() {
+                self.dev_id = id.to_string();
+                self.dev_password = pw.to_string();
+            }
+        }
+        self
     }
 }
 
@@ -94,6 +121,7 @@ pub struct ScreenScraper {
 
 impl ScreenScraper {
     pub fn new(creds: Credentials, fetch: Fetcher) -> Result<Self, String> {
+        let creds = creds.effective();
         if !creds.has_dev() {
             return Err(
                 "ScreenScraper needs developer credentials (Dev ID and Dev password) in \

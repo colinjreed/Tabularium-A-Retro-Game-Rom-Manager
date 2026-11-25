@@ -2,6 +2,7 @@
 name = "tabularium"
 version.workspace = true
 edition.workspace = true
+license = "GPL-3.0-or-later"
 
 [dependencies]
 eframe = { version = "0.37.0", default-features = false, features = ["accesskit", "clipboard", "default_fonts", "glow", "links", "persistence", "wayland", "x11"] }
