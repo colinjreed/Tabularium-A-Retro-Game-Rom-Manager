@@ -3,6 +3,8 @@ use crate::widgets::{card, page_title, section};
 use egui::{RichText, Ui};
 use tabularium_core::library::Library;
 
+const REPO: &str = "https://github.com/colinjreed/Tabularium-A-Retro-Game-Rom-Manager";
+
 impl RomApp {
     pub fn settings_page(&mut self, ui: &mut Ui) {
         page_title(ui, "Settings", "");
@@ -41,10 +43,18 @@ impl RomApp {
         ui.add_space(10.0);
         card(ui, |ui| {
             section(ui, "ScreenScraper account");
-            ui.label(
-                "ScreenScraper needs your user account plus developer credentials. Request developer \
-                 credentials for this program on the ScreenScraper forum.",
-            );
+            let builtin =
+                tabularium_core::scrapers::screenscraper::Credentials::builtin_dev().is_some();
+            ui.horizontal_wrapped(|ui| {
+                ui.label("Artwork from");
+                ui.hyperlink_to("ScreenScraper.fr", "https://www.screenscraper.fr");
+                ui.label(if builtin {
+                    "needs a free account there; your own daily quota applies."
+                } else {
+                    "needs your account plus developer credentials, which can be requested on the \
+                     ScreenScraper forum."
+                });
+            });
             let c = &mut self.settings.screenscraper;
             egui::Grid::new("ss")
                 .num_columns(2)
@@ -56,12 +66,14 @@ impl RomApp {
                     ui.label("Password");
                     ui.add(egui::TextEdit::singleline(&mut c.password).password(true));
                     ui.end_row();
-                    ui.label("Developer ID");
-                    ui.text_edit_singleline(&mut c.dev_id);
-                    ui.end_row();
-                    ui.label("Developer password");
-                    ui.add(egui::TextEdit::singleline(&mut c.dev_password).password(true));
-                    ui.end_row();
+                    if !builtin {
+                        ui.label("Developer ID");
+                        ui.text_edit_singleline(&mut c.dev_id);
+                        ui.end_row();
+                        ui.label("Developer password");
+                        ui.add(egui::TextEdit::singleline(&mut c.dev_password).password(true));
+                        ui.end_row();
+                    }
                 });
             ui.checkbox(
                 &mut self.settings.remember_passwords,
@@ -112,6 +124,53 @@ impl RomApp {
             ).weak());
         });
         ui.add_space(10.0);
-        ui.label(RichText::new(format!("Tabularium {}", env!("CARGO_PKG_VERSION"))).weak());
+        card(ui, |ui| {
+            section(
+                ui,
+                &format!("About Tabularium {}", env!("CARGO_PKG_VERSION")),
+            );
+            ui.horizontal_wrapped(|ui| {
+                ui.label("Free software under the");
+                ui.hyperlink_to(
+                    "GNU General Public License v3",
+                    "https://www.gnu.org/licenses/gpl-3.0.html",
+                );
+                ui.label("or later. Source code:");
+                ui.hyperlink_to("GitHub", REPO);
+            });
+            ui.add_space(4.0);
+            ui.label(RichText::new("Thanks to").strong());
+            for (name, url, what) in [
+                (
+                    "ScreenScraper.fr",
+                    "https://www.screenscraper.fr",
+                    "artwork and game data",
+                ),
+                (
+                    "libretro",
+                    "https://github.com/libretro",
+                    "thumbnails, game databases and genres",
+                ),
+                ("No-Intro", "https://no-intro.org", "official game names"),
+                (
+                    "Google Fonts",
+                    "https://fonts.google.com",
+                    "the theme fonts (SIL Open Font License)",
+                ),
+            ] {
+                ui.horizontal_wrapped(|ui| {
+                    ui.hyperlink_to(name, url);
+                    ui.label(RichText::new(format!("for {what}")).weak());
+                });
+            }
+            ui.label(
+                RichText::new(
+                    "The licenses of the open-source libraries Tabularium is built with are in the \
+                     'licenses' folder that comes with the download.",
+                )
+                .weak()
+                .small(),
+            );
+        });
     }
 }

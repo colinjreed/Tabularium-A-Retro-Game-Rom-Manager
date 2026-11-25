@@ -227,17 +227,27 @@ the `.pc` suffix it needs.
 
 | | libretro thumbnails (default) | ScreenScraper |
 |---|---|---|
-| Account | none | your account, plus developer credentials |
+| Account | none | a free ScreenScraper account |
 | Matches by | filename (with fuzzy matching) | file contents (CRC + size), then name |
 | Best for | No-Intro / Redump-named sets | badly named files, arcade, hacks |
 | Image types | box art, screenshot, title screen | the same, plus mix images and logos |
 
 With both enabled, anything one source misses is tried on the other. Enter
-ScreenScraper details in **Settings**. Developer credentials are requested
-on the ScreenScraper forum. Passwords are kept only until you quit, unless
-you tick *Remember passwords*. The `SCREENSCRAPER_USER`,
-`SCREENSCRAPER_PASSWORD`, `SCREENSCRAPER_DEVID` and
-`SCREENSCRAPER_DEVPASSWORD` environment variables also work.
+your ScreenScraper account in **Settings**; your own daily quota applies.
+Passwords are kept only until you quit, unless you tick *Remember passwords*.
+The `SCREENSCRAPER_USER` and `SCREENSCRAPER_PASSWORD` environment variables
+also work.
+
+Release downloads have Tabularium's ScreenScraper developer credentials built
+in. If you build Tabularium yourself, either request your own on the
+ScreenScraper forum and enter them in Settings (or set
+`SCREENSCRAPER_DEVID` / `SCREENSCRAPER_DEVPASSWORD`), or set those variables
+while building to build them in. Requests are paced at least 1.1 seconds
+apart and stop on quota errors; please keep it that way.
+
+Artwork and game data come from [ScreenScraper.fr](https://www.screenscraper.fr)
+and the [libretro](https://github.com/libretro) thumbnail and database
+projects. Official names come from [No-Intro](https://no-intro.org).
 
 ## Library folder
 
@@ -275,5 +285,25 @@ Wayland, `libxkbcommon-x11`, OpenGL), which every desktop distribution
 already has. File dialogs use the XDG desktop portal. If yours has none,
 type paths into the boxes next to each *Choose…* button.
 
-To publish a release, push a tag such as `v0.2.0`. The workflow builds all
-three platforms and attaches them to a GitHub release.
+To publish a release, push a tag such as `v0.2.0` (or create the release on
+GitHub with a new tag). The workflow builds all three platforms and attaches
+them to the release. Each download includes `LICENSE.txt` and a `licenses`
+folder with the licenses of the libraries and fonts it's built with
+(`packaging/licenses.sh`, using
+[cargo-about](https://github.com/EmbarkStudios/cargo-about); `about.toml`
+lists the licenses dependencies may use). The `SCREENSCRAPER_DEVID` and
+`SCREENSCRAPER_DEVPASSWORD` repository secrets, if set, are built into the
+downloads.
+
+## License
+
+Tabularium is free software: you can redistribute it and/or modify it under
+the terms of the [GNU General Public License](LICENSE) as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version. It is distributed in the hope that it will be
+useful, but without any warranty.
+
+The bundled fonts (Press Start 2P, VT323, Rubik, Orbitron and Share Tech
+Mono) are under the SIL Open Font License; see `assets/fonts`.
+
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).

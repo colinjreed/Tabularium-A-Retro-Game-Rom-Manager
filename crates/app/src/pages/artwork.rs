@@ -58,8 +58,24 @@ impl RomApp {
             });
             ui.label(RichText::new(
                 "    Matches by file contents, so it finds badly named ROMs and arcade games, and has mix images \
-                 and logos. Needs your account and developer credentials.",
+                 and logos. Needs a free ScreenScraper account.",
             ).weak());
+            ui.horizontal(|ui| {
+                ui.label(
+                    RichText::new("    Artwork and game data from")
+                        .weak()
+                        .small(),
+                );
+                ui.hyperlink_to(
+                    RichText::new("ScreenScraper.fr").small(),
+                    "https://www.screenscraper.fr",
+                );
+                ui.label(
+                    RichText::new("and the libretro thumbnail project.")
+                        .weak()
+                        .small(),
+                );
+            });
             if !has_dev {
                 ui.horizontal(|ui| {
                     ui.label("    ");
