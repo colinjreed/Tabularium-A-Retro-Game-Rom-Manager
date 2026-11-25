@@ -115,6 +115,18 @@ your messy folders ──Import──▶ LIBRARY (sorted by system, indexed)
   Library, *🎲 Surprise me* picks a random unplayed game from the current
   list.
 
+### Themes
+
+Tabularium comes in ten looks, picked on the **Themes** page: Standard (follows
+your system's light or dark mode), Game Boy, NES, Commodore 64, Arcade CRT,
+Virtual Boy, Famicom, Atomic Purple, GameCube and Cyberpunk. Each retro theme
+has its own fonts, pixel-art icons, button style, line art of its hardware in
+the sidebar and a short start-up screen. CRT scanlines and an LCD screen effect
+can be switched on with any theme, and the animations and start-up screen can
+be turned off.
+
+![Game Boy, NES, Atomic Purple and Cyberpunk themes](docs/screenshots/themes.png)
+
 ## Supported handheld firmware
 
 | Firmware | Devices | ROMs | Artwork | BIOS |
