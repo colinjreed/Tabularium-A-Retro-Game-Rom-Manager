@@ -798,6 +798,29 @@ pub enum Area {
     Bar,
 }
 
+/// Extra room the Cyberpunk theme needs inside each panel so text stays
+/// clear of its HUD frames.
+fn cyber_margin(area: Area) -> egui::Margin {
+    match area {
+        Area::Main => egui::Margin::symmetric(22, 18),
+        Area::Side => egui::Margin::symmetric(16, 16),
+        Area::Bar => egui::Margin::symmetric(18, 6),
+    }
+}
+
+/// The frame (fill and inner margin) for one of the app's main panels.
+pub fn panel_frame(area: Area, style: &egui::Style) -> egui::Frame {
+    let base = match area {
+        Area::Main => egui::Frame::central_panel(style),
+        _ => egui::Frame::side_top_panel(style),
+    };
+    if theme(current()).fx == Fx::Cyberdeck {
+        base.inner_margin(cyber_margin(area))
+    } else {
+        base
+    }
+}
+
 /// Shading (and for some themes, frames) for a panel. Call first thing inside the panel.
 pub fn paint_panel(ui: &mut Ui, area: Area, tex: &mut Textures) {
     let t = theme(current());
@@ -867,6 +890,15 @@ pub fn paint_panel(ui: &mut Ui, area: Area, tex: &mut Textures) {
         }
     }
     if t.fx == Fx::Cyberdeck {
+        // Draw relative to the panel's outer edge, outside the content margin.
+        let m = cyber_margin(area);
+        let rect = Rect::from_min_max(
+            rect.min - Vec2::new(m.left as f32, m.top as f32),
+            rect.max + Vec2::new(m.right as f32, m.bottom as f32),
+        );
+        let mut painter = painter.clone();
+        painter.set_clip_rect(rect);
+        let painter = &painter;
         let (col, inset) = match area {
             Area::Side => (c(0x00f0ff), 6.0),
             Area::Main => (c(0xf3e600), 4.0),
