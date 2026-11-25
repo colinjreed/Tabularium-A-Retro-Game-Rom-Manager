@@ -481,6 +481,49 @@ pub fn folder_game_system(dir: &Path) -> Option<&'static System> {
 pub struct ScanResult {
     pub sets: Vec<RomSet>,
     pub skipped: Vec<PathBuf>,
+    /// Files macOS had to download from iCloud before they could be read.
+    pub from_cloud: usize,
+}
+
+/// A file macOS keeps only in iCloud (or another cloud drive): reading it
+/// makes macOS download the whole file first, which can take a while.
+/// Checking doesn't download anything. Always false on other systems.
+pub fn is_cloud_placeholder(path: &Path) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        use std::os::macos::fs::MetadataExt;
+        const SF_DATALESS: u32 = 0x4000_0000;
+        if let Ok(m) = std::fs::symlink_metadata(path) {
+            return m.st_flags() & SF_DATALESS != 0;
+        }
+    }
+    let _ = path;
+    false
+}
+
+/// The cloud service whose synced folder `path` is in, if any.
+pub fn cloud_folder(path: &Path) -> Option<&'static str> {
+    let s = path.to_string_lossy().replace('\\', "/");
+    let lower = s.to_lowercase();
+    if lower.contains("/library/mobile documents/") || lower.ends_with("/library/mobile documents")
+    {
+        return Some("iCloud Drive");
+    }
+    for (needle, name) in [
+        ("/library/cloudstorage/dropbox", "Dropbox"),
+        ("/library/cloudstorage/onedrive", "OneDrive"),
+        ("/library/cloudstorage/googledrive", "Google Drive"),
+        ("/library/cloudstorage/", "a cloud drive"),
+        ("/dropbox/", "Dropbox"),
+        ("/onedrive", "OneDrive"),
+        ("/google drive/", "Google Drive"),
+        ("/my drive/", "Google Drive"),
+    ] {
+        if lower.contains(needle) {
+            return Some(name);
+        }
+    }
+    None
 }
 
 /// Find every ROM under the given files/folders.
@@ -589,17 +632,22 @@ pub fn scan_with_progress(
     // so do several at once; slow drives and network shares benefit most.
     let total = todo.len();
     let done = std::sync::atomic::AtomicUsize::new(0);
+    let cloud = std::sync::atomic::AtomicUsize::new(0);
     let detected: Vec<Option<RomSet>> = todo
         .par_iter()
         .map(|(p, root)| {
             if cancel() {
                 return None;
             }
-            // Name the file before opening it, so a file that hangs (say, one
-            // macOS must first download from iCloud) is visible on screen.
+            // Name the file before opening it, so a slow one is visible.
             let n = done.load(std::sync::atomic::Ordering::Relaxed);
             let name = p.file_name().unwrap_or_default().to_string_lossy();
-            progress(n, total, &format!("Identifying {name}"));
+            if is_cloud_placeholder(p) {
+                cloud.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                progress(n, total, &format!("Downloading from iCloud: {name}"));
+            } else {
+                progress(n, total, &format!("Identifying {name}"));
+            }
             let rs = detect(p, Some(root), forced);
             done.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             Some(rs)
@@ -609,5 +657,6 @@ pub fn scan_with_progress(
         return ScanResult::default();
     }
     out.sets.extend(detected.into_iter().flatten());
+    out.from_cloud = cloud.into_inner();
     out
 }

@@ -487,3 +487,17 @@ fn screenscraper_queries_once_per_rom() {
     assert!(ScreenScraper::new(Credentials::default(), Arc::new(|_: &str| Ok(None))).is_err());
     assert_eq!(pick_media(&[], "boxart"), None);
 }
+
+#[test]
+fn recognises_cloud_synced_folders() {
+    use std::path::Path;
+    use tabularium_core::detect::cloud_folder;
+    let icloud = "/Users/me/Library/Mobile Documents/com~apple~CloudDocs/ROMs";
+    assert_eq!(cloud_folder(Path::new(icloud)), Some("iCloud Drive"));
+    let dropbox = "/Users/me/Library/CloudStorage/Dropbox/ROMs";
+    assert_eq!(cloud_folder(Path::new(dropbox)), Some("Dropbox"));
+    let onedrive = "C:\\Users\\me\\OneDrive\\ROMs";
+    assert_eq!(cloud_folder(Path::new(onedrive)), Some("OneDrive"));
+    assert_eq!(cloud_folder(Path::new("/Users/me/ROMs")), None);
+    assert_eq!(cloud_folder(Path::new("/Users/me/Documents/ROMs")), None);
+}

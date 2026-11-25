@@ -39,6 +39,26 @@ impl RomApp {
             "Add folders of ROMs. Each file's system is worked out from its extension, zip contents, \
              folder names or file header, and it's filed into the library.",
         );
+        if let Some(svc) = self
+            .lib
+            .as_ref()
+            .and_then(|l| tabularium_core::detect::cloud_folder(&l.root))
+        {
+            card(ui, |ui| {
+                ui.colored_label(
+                    widgets::warn_color(ui),
+                    RichText::new(format!("Your library is in {svc}")).strong(),
+                );
+                ui.label(
+                    "Syncing services can damage the library's database while Tabularium has it \
+                     open, and every ROM you import gets uploaded. For the best results, quit \
+                     Tabularium, move the library folder somewhere ordinary (for example your \
+                     home folder) in Finder, then use Settings → Open another library… to open \
+                     it from there.",
+                );
+            });
+            ui.add_space(10.0);
+        }
         card(ui, |ui| {
             section(ui, "Folders and files to import");
             let mut remove = None;
@@ -55,6 +75,21 @@ impl RomApp {
             }
             if self.import.sources.is_empty() {
                 ui.label(RichText::new("Nothing added yet.").weak());
+            }
+            if let Some(svc) = self
+                .import
+                .sources
+                .iter()
+                .find_map(|p| tabularium_core::detect::cloud_folder(p))
+            {
+                ui.colored_label(
+                    widgets::warn_color(ui),
+                    format!(
+                        "This is in {svc}. Files that are only stored online are downloaded one by \
+                         one as they're imported, which can be very slow. Right-click the folder in \
+                         Finder and choose Download Now (or Keep Downloaded) first."
+                    ),
+                );
             }
             ui.horizontal(|ui| {
                 if ui.button("Add folder…").clicked() {
@@ -198,6 +233,17 @@ fn import_results(ui: &mut Ui, rep: &ImportReport, dry: bool) {
         rep.unknown.len()
     );
     ui.label(RichText::new(head).strong().size(crate::themes::fs(15.0)));
+    if rep.from_cloud > 0 {
+        ui.colored_label(
+            widgets::warn_color(ui),
+            format!(
+                "{} file(s) were stored only in iCloud and had to be downloaded first, which is slow. \
+                 Before importing, right-click the folder in Finder and choose Download Now \
+                 (or Keep Downloaded).",
+                rep.from_cloud
+            ),
+        );
+    }
     if rep.cancelled {
         ui.colored_label(widgets::warn_color(ui), "Stopped before finishing.");
     }
