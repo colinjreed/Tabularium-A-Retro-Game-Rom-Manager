@@ -627,54 +627,66 @@ impl eframe::App for RomApp {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         self.poll_job();
         crate::themes::paint_background(ui.ctx(), &mut self.theme_tex);
-        egui::Panel::bottom("status").show(ui, |ui| {
-            crate::themes::paint_panel(ui, crate::themes::Area::Bar, &mut self.theme_tex);
-            self.status_bar(ui)
-        });
+        let style = ui.style().clone();
+        egui::Panel::bottom("status")
+            .frame(crate::themes::panel_frame(crate::themes::Area::Bar, &style))
+            .show(ui, |ui| {
+                crate::themes::paint_panel(ui, crate::themes::Area::Bar, &mut self.theme_tex);
+                self.status_bar(ui)
+            });
         egui::Panel::left("nav")
+            .frame(crate::themes::panel_frame(
+                crate::themes::Area::Side,
+                &style,
+            ))
             .resizable(false)
             .exact_size(180.0)
             .show(ui, |ui| {
                 crate::themes::paint_panel(ui, crate::themes::Area::Side, &mut self.theme_tex);
                 self.nav(ui)
             });
-        egui::CentralPanel::default().show(ui, |ui| {
-            crate::themes::paint_panel(ui, crate::themes::Area::Main, &mut self.theme_tex);
-            if self.page == Page::Themes {
-                egui::ScrollArea::vertical().show(ui, |ui| self.themes_page(ui));
-                return;
-            }
-            if self.lib.is_none() && self.page != Page::Settings {
-                egui::ScrollArea::vertical().show(ui, |ui| self.welcome(ui));
-                return;
-            }
-            match self.page {
-                Page::Library => self.library_page(ui),
-                Page::Import => {
-                    egui::ScrollArea::vertical()
-                        .show(ui, |ui| self.import_page(ui))
-                        .inner
+        egui::CentralPanel::default()
+            .frame(crate::themes::panel_frame(
+                crate::themes::Area::Main,
+                &style,
+            ))
+            .show(ui, |ui| {
+                crate::themes::paint_panel(ui, crate::themes::Area::Main, &mut self.theme_tex);
+                if self.page == Page::Themes {
+                    egui::ScrollArea::vertical().show(ui, |ui| self.themes_page(ui));
+                    return;
                 }
-                Page::Clean => self.clean_page(ui),
-                Page::Artwork => {
-                    egui::ScrollArea::vertical()
-                        .show(ui, |ui| self.artwork_page(ui))
-                        .inner
+                if self.lib.is_none() && self.page != Page::Settings {
+                    egui::ScrollArea::vertical().show(ui, |ui| self.welcome(ui));
+                    return;
                 }
-                Page::Bios => {
-                    egui::ScrollArea::vertical()
-                        .show(ui, |ui| self.bios_page(ui))
-                        .inner
+                match self.page {
+                    Page::Library => self.library_page(ui),
+                    Page::Import => {
+                        egui::ScrollArea::vertical()
+                            .show(ui, |ui| self.import_page(ui))
+                            .inner
+                    }
+                    Page::Clean => self.clean_page(ui),
+                    Page::Artwork => {
+                        egui::ScrollArea::vertical()
+                            .show(ui, |ui| self.artwork_page(ui))
+                            .inner
+                    }
+                    Page::Bios => {
+                        egui::ScrollArea::vertical()
+                            .show(ui, |ui| self.bios_page(ui))
+                            .inner
+                    }
+                    Page::Collections => self.collections_page(ui),
+                    Page::Themes => {}
+                    Page::Settings => {
+                        egui::ScrollArea::vertical()
+                            .show(ui, |ui| self.settings_page(ui))
+                            .inner
+                    }
                 }
-                Page::Collections => self.collections_page(ui),
-                Page::Themes => {}
-                Page::Settings => {
-                    egui::ScrollArea::vertical()
-                        .show(ui, |ui| self.settings_page(ui))
-                        .inner
-                }
-            }
-        });
+            });
         self.empty_trash_dialog(ui);
         if self.settings.animations {
             themes::paint_motion(ui.ctx(), self.settings.crt_effect);
