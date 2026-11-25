@@ -345,12 +345,12 @@ impl RomApp {
                 } else {
                     0.0
                 };
-                let text = if total > 0 {
-                    format!("{done} / {total}")
-                } else {
-                    "Working…".into()
-                };
-                ui.add(egui::ProgressBar::new(frac).text(text).desired_width(260.0));
+                // The count goes beside the bar, not on it: some themes'
+                // bar colours make text on the bar unreadable.
+                ui.add(egui::ProgressBar::new(frac).desired_width(220.0));
+                if total > 0 {
+                    ui.label(format!("{done} / {total}"));
+                }
                 ui.label(RichText::new(current).weak());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if job.cancel_requested() {

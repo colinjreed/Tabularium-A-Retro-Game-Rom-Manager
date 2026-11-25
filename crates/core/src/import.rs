@@ -33,6 +33,8 @@ pub struct ImportReport {
     pub errors: Vec<(PathBuf, String)>,
     pub unknown: Vec<RomSet>,
     pub ignored: usize,
+    /// Files macOS had to download from iCloud first.
+    pub from_cloud: usize,
     pub cancelled: bool,
 }
 
@@ -72,6 +74,7 @@ pub fn import(
         crate::rename::plan_import(&mut found.sets, dats.as_mut(), opts.strip_numbers, rep);
     }
     out.ignored = found.skipped.len();
+    out.from_cloud = found.from_cloud;
     let total = found.sets.len();
     lib.begin()?;
     for (i, rs) in found.sets.into_iter().enumerate() {
