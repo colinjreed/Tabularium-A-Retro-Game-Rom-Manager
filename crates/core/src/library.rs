@@ -12,7 +12,6 @@
 //! ```
 
 use crate::detect::RomSet;
-use crate::hashing::content_crc;
 use crate::{naming, Error, Result};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::collections::{BTreeMap, BTreeSet};
@@ -275,6 +274,9 @@ impl Library {
             ("played", "INTEGER NOT NULL DEFAULT 0"),
             ("play_count", "INTEGER NOT NULL DEFAULT 0"),
             ("last_played", "REAL"),
+            // 2: disc games are checksummed by their tracks, not the sheet
+            // file (see `recheck_disc_games`). 0: added by an older version.
+            ("crc_v", "INTEGER NOT NULL DEFAULT 0"),
         ] {
             let exists: bool = db
                 .prepare("SELECT 1 FROM pragma_table_info('roms') WHERE name = ?1")?
@@ -560,7 +562,7 @@ impl Library {
             .ok_or_else(|| Error::Other("ROM has no system".into()))?;
         let (crc, csize) = match &rs.crc {
             Some(c) => c.clone(),
-            None => content_crc(&rs.main)?,
+            None => crate::hashing::set_crc(&rs.main, &rs.companions)?,
         };
         if let Some(existing) = self.find_by_crc(sys.id, &crc, csize)? {
             return Ok(AddOutcome::Duplicate(existing.path));
@@ -619,8 +621,8 @@ impl Library {
         let flags: Vec<&String> = p.flags.iter().collect();
         self.db.execute(
             "INSERT INTO roms (system, path, files, stem, title, key, regions, languages, revision, disc, \
-             flags, verified, crc, content_size, total_size, source, added) \
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
+             flags, verified, crc, content_size, total_size, source, added, crc_v) \
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,2)",
             params![
                 sys.id,
                 files[0],
@@ -642,6 +644,52 @@ impl Library {
             ],
         )?;
         Ok(AddOutcome::Added(files[0].clone()))
+    }
+
+    /// Disc games (sheet plus track files) added by an older version, whose
+    /// checksum came from the sheet file and so misses duplicates.
+    pub fn disc_games_to_recheck(&self) -> Result<Vec<Rom>> {
+        let mut st = self.db.prepare(
+            "SELECT * FROM roms WHERE crc_v < 2 AND \
+             (lower(path) LIKE '%.cue' OR lower(path) LIKE '%.gdi' OR lower(path) LIKE '%.ccd')",
+        )?;
+        let rows = st.query_map([], Rom::from_row)?;
+        Ok(rows
+            .collect::<std::result::Result<Vec<_>, _>>()?
+            .into_iter()
+            .filter(|r| r.files.len() > 1)
+            .collect())
+    }
+
+    /// Re-checksum older disc games by their track data, so the duplicate
+    /// check finds the same disc under different file names. Returns how
+    /// many were updated. Safe to stop part-way and run again.
+    pub fn recheck_disc_games(&self, rep: &dyn crate::progress::Reporter) -> Result<usize> {
+        let roms = self.disc_games_to_recheck()?;
+        let total = roms.len();
+        let mut done = 0;
+        for (i, r) in roms.iter().enumerate() {
+            if rep.cancelled() {
+                break;
+            }
+            rep.progress(i, total, &format!("Checking {}", r.stem));
+            let paths = self.abspaths(r);
+            let Some((main, tracks)) = paths.split_first() else {
+                continue;
+            };
+            match crate::hashing::set_crc(main, tracks) {
+                Ok((crc, size)) => {
+                    self.db.execute(
+                        "UPDATE roms SET crc = ?1, content_size = ?2, crc_v = 2 WHERE id = ?3",
+                        params![crc, size as i64, r.id],
+                    )?;
+                    done += 1;
+                }
+                Err(e) => rep.log(format!("Couldn't read {}: {e}", r.stem)),
+            }
+        }
+        rep.progress(total, total, "Done");
+        Ok(done)
     }
 
     pub fn add_unsorted(&self, rs: &RomSet, move_files: bool) -> Result<()> {

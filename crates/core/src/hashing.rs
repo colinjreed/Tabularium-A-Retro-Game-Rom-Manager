@@ -3,7 +3,7 @@
 use md5::{Digest, Md5};
 use std::fs::File;
 use std::io::{self, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const CHUNK: usize = 1 << 20;
 
@@ -44,6 +44,38 @@ pub fn content_crc(path: &Path) -> io::Result<(String, u64)> {
         }
         h.update(&buf[..n]);
         size += n as u64;
+    }
+    Ok((format!("{:08x}", h.finalize()), size))
+}
+
+/// Sheet files whose real data lives in the track files they list.
+fn is_sheet(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "cue" | "gdi" | "ccd"))
+}
+
+/// CRC32 (hex) and size of a whole game: for a disc made of a sheet (.cue,
+/// .gdi, .ccd) plus track files, the tracks' data in the order given,
+/// ignoring every file name, so the same disc is recognised however its
+/// files are named. Anything else is [`content_crc`] of the main file.
+pub fn set_crc(main: &Path, companions: &[PathBuf]) -> io::Result<(String, u64)> {
+    if companions.is_empty() || !is_sheet(main) {
+        return content_crc(main);
+    }
+    let mut h = crc32fast::Hasher::new();
+    let mut buf = vec![0u8; CHUNK];
+    let mut size = 0u64;
+    for p in companions {
+        let mut f = File::open(p)?;
+        loop {
+            let n = f.read(&mut buf)?;
+            if n == 0 {
+                break;
+            }
+            h.update(&buf[..n]);
+            size += n as u64;
+        }
     }
     Ok((format!("{:08x}", h.finalize()), size))
 }

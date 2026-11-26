@@ -501,3 +501,88 @@ fn recognises_cloud_synced_folders() {
     assert_eq!(cloud_folder(Path::new("/Users/me/ROMs")), None);
     assert_eq!(cloud_folder(Path::new("/Users/me/Documents/ROMs")), None);
 }
+
+fn cue_set(dir: &Path, sheet: &str, track: &str, data: &[u8]) {
+    write(&dir.join(track), data);
+    write(
+        &dir.join(sheet),
+        format!("FILE \"{track}\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n")
+            .as_bytes(),
+    );
+}
+
+#[test]
+fn disc_games_are_compared_by_their_tracks_not_file_names() -> Result<()> {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("src/PS1");
+    let disc = rand(300_000, "same disc");
+    cue_set(&src, "Game A.cue", "Game A.bin", &disc);
+    cue_set(&src, "Copy of A.cue", "track01 renamed.bin", &disc);
+    cue_set(
+        &src,
+        "Game B.cue",
+        "Game B.bin",
+        &rand(300_000, "other disc"),
+    );
+    let lib = Library::create(&tmp.path().join("lib"))?;
+    let rep = import(
+        &lib,
+        &[tmp.path().join("src")],
+        &ImportOptions::default(),
+        &Silent,
+    )?;
+    assert_eq!(rep.added.get("psx"), Some(&2), "{rep:?}");
+    assert_eq!(rep.duplicates.len(), 1, "{rep:?}");
+    assert!(lib.disc_games_to_recheck()?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn older_disc_games_are_rechecked_by_their_tracks() -> Result<()> {
+    let tmp = tempfile::tempdir().unwrap();
+    let disc = rand(300_000, "same disc");
+    let lib_dir = tmp.path().join("lib");
+    let lib = Library::create(&lib_dir)?;
+    cue_set(
+        &tmp.path().join("one/PS1"),
+        "Game A.cue",
+        "Game A.bin",
+        &disc,
+    );
+    import(
+        &lib,
+        &[tmp.path().join("one")],
+        &ImportOptions::default(),
+        &Silent,
+    )?;
+    // Make that game look like it was added by an older version, which
+    // checksummed the .cue sheet.
+    let db = rusqlite::Connection::open(lib_dir.join("library.db")).unwrap();
+    db.execute(
+        "UPDATE roms SET crc = 'deadbeef', content_size = 70, crc_v = 0",
+        [],
+    )
+    .unwrap();
+    cue_set(
+        &tmp.path().join("two/PS1"),
+        "A copy.cue",
+        "a copy.bin",
+        &disc,
+    );
+    let rep = import(
+        &lib,
+        &[tmp.path().join("two")],
+        &ImportOptions::default(),
+        &Silent,
+    )?;
+    assert_eq!(rep.duplicates.len(), 0, "old checksum hides the copy");
+    let roms = lib.active()?;
+    assert!(tabularium_core::filters::exact_duplicates(&roms).is_empty());
+
+    assert_eq!(lib.disc_games_to_recheck()?.len(), 1);
+    assert_eq!(lib.recheck_disc_games(&Silent)?, 1);
+    assert!(lib.disc_games_to_recheck()?.is_empty());
+    let dupes = tabularium_core::filters::exact_duplicates(&lib.active()?);
+    assert_eq!(dupes.len(), 1, "the copy is found once rechecked");
+    Ok(())
+}
