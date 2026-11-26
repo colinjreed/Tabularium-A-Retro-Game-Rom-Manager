@@ -58,6 +58,8 @@ pub struct LibData {
     pub stats: BTreeMap<String, SystemStats>,
     pub with_art: HashSet<i64>,
     pub tags: Vec<(String, u64)>,
+    /// Older disc games whose checksum still comes from the sheet file.
+    pub discs_to_recheck: usize,
     pub genres: Vec<(String, u64)>,
     /// SD card (collection) names, for "Add to card".
     pub cards: Vec<String>,
@@ -176,6 +178,7 @@ impl RomApp {
                 stats: lib.stats()?,
                 with_art: lib.roms_with_media("boxart")?,
                 tags: lib.all_tags()?,
+                discs_to_recheck: lib.disc_games_to_recheck()?.len(),
                 genres: lib.all_genres()?,
                 cards: tabularium_core::collection::list(lib),
                 version: 0,
@@ -257,6 +260,12 @@ impl RomApp {
                     msg += &format!(" {n}");
                 }
                 self.notify(msg);
+            }
+            Some(JobOutput::DiscsRechecked(n)) => {
+                self.reload();
+                self.notify(format!(
+                    "Rechecked {n} disc game(s). Use 'Find ROMs to remove' to see any copies."
+                ));
             }
             Some(JobOutput::Genres(n)) => {
                 self.reload();

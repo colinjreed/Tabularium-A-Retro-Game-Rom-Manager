@@ -34,6 +34,26 @@ impl RomApp {
                     "Find duplicates and versions you don't want. Nothing is deleted: removed ROMs go to the \
                      trash, where you can restore them.",
                 );
+                let n = self.data.discs_to_recheck;
+                if n > 0 {
+                    card(ui, |ui| {
+                        section(ui, "Disc games");
+                        ui.label(format!(
+                            "{n} disc game(s) were added by an older version, which compared disc games by \
+                             their .cue/.gdi/.ccd file rather than the disc itself, so copies with different \
+                             file names weren't spotted as duplicates. Recheck them once to fix this. It \
+                             reads every track, so it can take a while for large collections."
+                        ));
+                        if ui
+                            .add_enabled(!self.busy(), egui::Button::new(RichText::new("Recheck disc games").strong()))
+                            .clicked()
+                        {
+                            self.clean.results = None;
+                            self.start_disc_recheck(ui.ctx());
+                        }
+                    });
+                    ui.add_space(10.0);
+                }
                 card(ui, |ui| {
                     section(ui, "File names");
                     ui.label(
@@ -205,6 +225,20 @@ impl RomApp {
         if results.len() > 3000 {
             ui.label(format!("…and {} more", results.len() - 3000));
         }
+    }
+
+    fn start_disc_recheck(&mut self, ctx: &egui::Context) {
+        let Some(root) = self.library_root() else {
+            return;
+        };
+        self.job = Some(Job::spawn(
+            "Rechecking disc games",
+            ctx,
+            move |rep| match Library::open(&root).and_then(|lib| lib.recheck_disc_games(rep)) {
+                Ok(n) => JobOutput::DiscsRechecked(n),
+                Err(e) => JobOutput::Error(e.to_string()),
+            },
+        ));
     }
 
     fn start_rename(&mut self, ctx: &egui::Context, apply: bool) {

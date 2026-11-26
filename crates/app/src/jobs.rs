@@ -25,6 +25,8 @@ pub enum JobOutput {
     BiosImport(Vec<(PathBuf, ImportOutcome)>),
     History(tabularium_core::playhistory::PlayReport),
     Genres(usize),
+    /// Disc games re-checksummed by their tracks.
+    DiscsRechecked(usize),
     Rename {
         report: tabularium_core::rename::FixReport,
         applied: bool,

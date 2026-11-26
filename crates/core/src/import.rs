@@ -131,10 +131,11 @@ fn checksum_all(sets: &mut [RomSet], rep: &dyn Reporter) -> bool {
     use rayon::prelude::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
     const BIG: u64 = 64 << 20;
+    let len = |p: &std::path::Path| std::fs::metadata(p).map(|m| m.len()).unwrap_or(0);
     let is_big = |rs: &RomSet| {
         rs.main.is_dir()
             || (crate::detect::ext_of(&rs.main) != "zip"
-                && std::fs::metadata(&rs.main).map(|m| m.len()).unwrap_or(0) >= BIG)
+                && len(&rs.main) + rs.companions.iter().map(|c| len(c)).sum::<u64>() >= BIG)
     };
     let total = sets.iter().filter(|rs| rs.system.is_some()).count();
     let done = AtomicUsize::new(0);
@@ -142,7 +143,7 @@ fn checksum_all(sets: &mut [RomSet], rep: &dyn Reporter) -> bool {
         if rep.cancelled() {
             return;
         }
-        rs.crc = crate::hashing::content_crc(&rs.main).ok();
+        rs.crc = crate::hashing::set_crc(&rs.main, &rs.companions).ok();
         let n = done.fetch_add(1, Ordering::Relaxed) + 1;
         let name = rs.main.file_name().unwrap_or_default().to_string_lossy();
         rep.progress(n, total, &format!("Checking {name}"));
