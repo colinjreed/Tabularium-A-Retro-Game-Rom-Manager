@@ -557,6 +557,30 @@ impl Library {
 
     /// Copy (or move) a detected RomSet into the library.
     pub fn add(&self, rs: &RomSet, move_files: bool, dry_run: bool) -> Result<AddOutcome> {
+        self.add_inner(rs, move_files, dry_run, true)
+    }
+
+    /// Move a game the library already has into its trash (marked as a
+    /// duplicate of `of`), so a "move" import empties the source folder
+    /// without losing anything. Returns false if it couldn't be placed.
+    pub fn add_duplicate_to_trash(&self, rs: &RomSet, of: &str) -> Result<bool> {
+        match self.add_inner(rs, true, false, false)? {
+            AddOutcome::Added(_) => {
+                let rom = self.get(self.db.last_insert_rowid())?;
+                self.trash(&rom, &format!("duplicate of {of}"))?;
+                Ok(true)
+            }
+            _ => Ok(false),
+        }
+    }
+
+    fn add_inner(
+        &self,
+        rs: &RomSet,
+        move_files: bool,
+        dry_run: bool,
+        check_duplicates: bool,
+    ) -> Result<AddOutcome> {
         let sys = rs
             .system
             .ok_or_else(|| Error::Other("ROM has no system".into()))?;
@@ -564,8 +588,10 @@ impl Library {
             Some(c) => c.clone(),
             None => crate::hashing::set_crc(&rs.main, &rs.companions)?,
         };
-        if let Some(existing) = self.find_by_crc(sys.id, &crc, csize)? {
-            return Ok(AddOutcome::Duplicate(existing.path));
+        if check_duplicates {
+            if let Some(existing) = self.find_by_crc(sys.id, &crc, csize)? {
+                return Ok(AddOutcome::Duplicate(existing.path));
+            }
         }
         let dest_dir = self.root.join("roms").join(sys.id);
         let (stem, ext) = match (&rs.rename, rs.companions.is_empty() && rs.main.is_file()) {

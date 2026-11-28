@@ -233,6 +233,13 @@ fn import_results(ui: &mut Ui, rep: &ImportReport, dry: bool) {
         rep.unknown.len()
     );
     ui.label(RichText::new(head).strong().size(crate::themes::fs(15.0)));
+    if rep.duplicates_trashed > 0 {
+        ui.label(format!(
+            "{} duplicate(s) the library already had were moved to its Trash (Library → Trash), \
+             so the source folder could be emptied. Restore or empty them from there.",
+            rep.duplicates_trashed
+        ));
+    }
     if rep.from_cloud > 0 {
         ui.colored_label(
             widgets::warn_color(ui),
