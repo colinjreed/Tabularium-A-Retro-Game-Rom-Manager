@@ -605,7 +605,10 @@ pub fn scan_with_progress(
             candidates.push((root, parent));
             continue;
         }
+        // Sorted, so imports go in the same order on every machine (which
+        // copy of a duplicate is kept mustn't depend on the file system).
         let mut it = WalkDir::new(&root)
+            .sort_by_file_name()
             .into_iter()
             .filter_entry(|e| e.depth() == 0 || !e.file_name().to_string_lossy().starts_with('.'));
         while let Some(entry) = it.next() {
