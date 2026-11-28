@@ -322,7 +322,7 @@ fn theme(id: ThemeId) -> Theme {
             name: "Atomic Purple",
             blurb: "See-through purple, with the circuit board showing.",
             p: Palette {
-                bg: ca(0x5a3c96, 180),
+                bg: ca(0x5a3c96, 140),
                 panel: ca(0x3a1e68, 150),
                 bar: ca(0x281250, 225),
                 bar_fg: c(0xd9c6ff),
@@ -621,6 +621,7 @@ pub struct Textures {
     dither_gb_dark: Option<TextureHandle>,
     scanlines: Option<TextureHandle>,
     lcd: Option<TextureHandle>,
+    frost: Option<TextureHandle>,
 }
 
 fn load_png(ctx: &Context, name: &str, bytes: &[u8]) -> TextureHandle {
@@ -682,6 +683,19 @@ impl Textures {
                     c(0x306230)
                 } else {
                     c(0x0f380f)
+                }
+            }));
+            // Fine grain like matte, slightly frosted plastic.
+            self.frost = Some(pattern(ctx, "frost", 128, 128, |x, y| {
+                let mut h =
+                    (x as u32).wrapping_mul(0x9E37_79B1) ^ (y as u32).wrapping_mul(0x85EB_CA77);
+                h ^= h >> 15;
+                h = h.wrapping_mul(0x2C1B_3C6D);
+                h ^= h >> 12;
+                match h % 100 {
+                    0..=21 => Color32::from_white_alpha(9),
+                    22..=35 => Color32::from_black_alpha(11),
+                    _ => Color32::TRANSPARENT,
                 }
             }));
             self.scanlines = Some(pattern(ctx, "scanlines", 1, 3, |_, y| {
@@ -872,6 +886,15 @@ pub fn paint_panel(ui: &mut Ui, area: Area, tex: &mut Textures) {
             );
         }
         (Fx::Cyberdeck, _) => {}
+        // See-through plastic: just a sheen, so the board stays visible.
+        (Fx::Circuit, _) => {
+            vgrad(
+                painter,
+                rect,
+                Color32::from_white_alpha(16),
+                Color32::from_black_alpha(24),
+            );
+        }
         (_, Area::Side) => {
             vgrad(
                 painter,
@@ -888,6 +911,17 @@ pub fn paint_panel(ui: &mut Ui, area: Area, tex: &mut Textures) {
                 mix(p.bg, Color32::BLACK, 0.12),
             );
         }
+    }
+    if t.fx == Fx::Circuit {
+        // Frosted, matte plastic over the board, with a molded highlight on
+        // the top edge.
+        let tx = tex.get(ui.ctx());
+        tile(painter, tx.frost.as_ref().unwrap(), rect, Color32::WHITE);
+        painter.hline(
+            rect.x_range(),
+            rect.top() + 0.5,
+            Stroke::new(1.0, Color32::from_white_alpha(26)),
+        );
     }
     if t.fx == Fx::Cyberdeck {
         // Draw relative to the panel's outer edge, outside the content margin.
