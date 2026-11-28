@@ -496,6 +496,12 @@ pub fn ready_text() -> &'static str {
         .unwrap_or("Ready")
 }
 
+/// How much of what's under the panels shows through them (0 opaque, 1
+/// clear), from the current theme's panel colour.
+pub(crate) fn see_through() -> f32 {
+    1.0 - theme(current()).p.bg.a() as f32 / 255.0
+}
+
 pub fn current() -> ThemeId {
     ACTIVE
         .read()
