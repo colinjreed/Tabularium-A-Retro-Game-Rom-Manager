@@ -87,6 +87,8 @@ enum Fx {
     Scanlines,
     Circuit,
     Cyberdeck,
+    /// Scuffed console plastic: black ribbed sidebar with grey trim.
+    Worn,
 }
 
 #[derive(Clone, Copy)]
@@ -195,26 +197,27 @@ fn theme(id: ThemeId) -> Theme {
         },
         ThemeId::Nes => Theme {
             name: "NES",
-            blurb: "Console black, case grey and logo red.",
+            blurb: "Worn console plastic: black, case grey and logo red.",
             p: Palette {
-                bg: c(0x1b1b1f),
-                panel: c(0x26262b),
-                bar: c(0x8e8e94),
-                bar_fg: c(0x111114),
-                fg: c(0xececec),
-                dim: c(0x9a9aa2),
-                border: c(0x55555d),
+                bg: c(0x232326),
+                panel: c(0x1a1a1d),
+                bar: c(0xa9a59b),
+                bar_fg: c(0x141416),
+                fg: c(0xe6e4df),
+                dim: c(0x9c9a94),
+                border: c(0x4a4a50),
                 accent: c(0xe4000f),
                 accent2: c(0xe4000f),
                 sel: c(0xe4000f),
                 sel_fg: c(0xffffff),
-                stripe: c(0x222227),
+                stripe: Color32::from_black_alpha(56),
                 input: c(0x121215),
             },
             head: Font::Pixel,
             body: Font::Terminal,
             radius: 0,
             stroke: 2.0,
+            fx: Fx::Worn,
             ..base
         },
         ThemeId::Commodore64 => Theme {
@@ -554,6 +557,11 @@ pub fn apply(ctx: &Context, id: ThemeId, base: &(egui::Style, egui::Style)) {
     v.text_edit_bg_color = Some(p.input);
     v.code_bg_color = p.panel;
     v.panel_fill = p.bg;
+    if t.fx == Fx::Worn {
+        // The worn plastic is painted under each top-level panel; panels
+        // inside pages let it show through.
+        v.panel_fill = Color32::TRANSPARENT;
+    }
     v.window_fill = if p.panel.a() < 255 {
         mix(Color32::BLACK, p.panel, 0.9).to_opaque()
     } else {
@@ -628,6 +636,8 @@ pub struct Textures {
     scanlines: Option<TextureHandle>,
     lcd: Option<TextureHandle>,
     frost: Option<TextureHandle>,
+    worn: Option<TextureHandle>,
+    ribs: Option<TextureHandle>,
 }
 
 fn load_png(ctx: &Context, name: &str, bytes: &[u8]) -> TextureHandle {
@@ -704,6 +714,15 @@ impl Textures {
                     _ => Color32::TRANSPARENT,
                 }
             }));
+            self.worn = Some(worn_plastic(ctx));
+            // Moulded ribs, like the strip across the console's lid.
+            self.ribs = Some(pattern(ctx, "ribs", 1, 6, |_, y| match y {
+                0 => Color32::from_white_alpha(9),
+                1 => Color32::from_white_alpha(4),
+                4 => Color32::from_black_alpha(34),
+                5 => Color32::from_black_alpha(52),
+                _ => Color32::TRANSPARENT,
+            }));
             self.scanlines = Some(pattern(ctx, "scanlines", 1, 3, |_, y| {
                 if y == 2 {
                     ca(0x000000, 75)
@@ -721,6 +740,109 @@ impl Textures {
         }
         self
     }
+}
+
+fn hash3(x: u32, y: u32, seed: u32) -> u32 {
+    let mut h =
+        x.wrapping_mul(0x9E37_79B1) ^ y.wrapping_mul(0x85EB_CA77) ^ seed.wrapping_mul(0xC2B2_AE3D);
+    h ^= h >> 15;
+    h = h.wrapping_mul(0x2C1B_3C6D);
+    h ^= h >> 12;
+    h = h.wrapping_mul(0x297A_2D39);
+    h ^ (h >> 15)
+}
+
+/// Scuffed, grimy plastic that tiles: grain, uneven wear, scratches, gouges,
+/// scuff marks and specks of dirt, as a light/dark overlay for any colour.
+fn worn_plastic(ctx: &Context) -> TextureHandle {
+    const N: usize = 512;
+    let rnd = |x: usize, y: usize, s: u32| hash3(x as u32, y as u32, s) as f32 / u32::MAX as f32;
+    // Smooth noise that wraps at the texture's edges.
+    let noise = |x: usize, y: usize, cell: usize, s: u32| {
+        let n = N / cell;
+        let (gx, gy) = (x / cell, y / cell);
+        let sm = |t: f32| t * t * (3.0 - 2.0 * t);
+        let u = sm((x % cell) as f32 / cell as f32);
+        let v = sm((y % cell) as f32 / cell as f32);
+        let g = |i: usize, j: usize| rnd(i % n, j % n, s);
+        let top = g(gx, gy) + (g(gx + 1, gy) - g(gx, gy)) * u;
+        let bot = g(gx, gy + 1) + (g(gx + 1, gy + 1) - g(gx, gy + 1)) * u;
+        top + (bot - top) * v
+    };
+    let mut l = vec![0f32; N * N];
+    for y in 0..N {
+        for x in 0..N {
+            let mottle =
+                noise(x, y, 128, 1) * 0.55 + noise(x, y, 32, 2) * 0.3 + noise(x, y, 8, 5) * 0.15
+                    - 0.5;
+            let grain = rnd(x, y, 3) - 0.5;
+            let mut v = mottle * 0.55 + grain * 0.4;
+            if rnd(x, y, 4) < 0.0035 {
+                v -= 0.7;
+            }
+            if rnd(x, y, 6) < 0.002 {
+                v += 0.5;
+            }
+            l[y * N + x] = v;
+        }
+    }
+    let mut seed = 0x2545_F491u32;
+    let mut next = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        seed as f32 / u32::MAX as f32
+    };
+    fn line(l: &mut [f32], x: f32, y: f32, ang: f32, len: f32, amt: f32) {
+        let (dx, dy) = (ang.cos(), ang.sin());
+        let steps = (len * 2.0) as i32;
+        for i in 0..steps {
+            let t = i as f32 * 0.5;
+            // Scratches fade in and out at their ends.
+            let fade = (1.0 - (2.0 * t / len - 1.0).abs()).sqrt();
+            let px = (x + dx * t).rem_euclid(N as f32) as usize % N;
+            let py = (y + dy * t).rem_euclid(N as f32) as usize % N;
+            l[py * N + px] += amt * fade * 0.5;
+        }
+    }
+    let n = N as f32;
+    // Fine scratches from handling.
+    for _ in 0..70 {
+        let (x, y, a) = (next() * n, next() * n, next() * std::f32::consts::TAU);
+        line(&mut l, x, y, a, 15.0 + next() * 110.0, 0.5 + next() * 0.6);
+    }
+    // Deeper gouges: a dark groove with a lit edge.
+    for _ in 0..12 {
+        let (x, y, a) = (next() * n, next() * n, next() * std::f32::consts::TAU);
+        let len = 10.0 + next() * 45.0;
+        line(&mut l, x, y, a, len, -1.6);
+        line(&mut l, x, y + 1.0, a, len, 0.9);
+    }
+    // Scuffs: patches of short, nearly parallel scratches.
+    for _ in 0..12 {
+        let (cx, cy, a) = (next() * n, next() * n, next() * std::f32::consts::TAU);
+        for _ in 0..(10 + (next() * 14.0) as usize) {
+            let (ox, oy) = ((next() - 0.5) * 26.0, (next() - 0.5) * 26.0);
+            line(
+                &mut l,
+                cx + ox,
+                cy + oy,
+                a + (next() - 0.5) * 0.3,
+                5.0 + next() * 16.0,
+                0.35 + next() * 0.3,
+            );
+        }
+    }
+    let mut img = ColorImage::filled([N, N], Color32::TRANSPARENT);
+    for (i, v) in l.iter().enumerate() {
+        let v = v.clamp(-1.0, 1.0);
+        img.pixels[i] = if v > 0.0 {
+            Color32::from_white_alpha((v * 46.0) as u8)
+        } else {
+            Color32::from_black_alpha((-v * 70.0) as u8)
+        };
+    }
+    ctx.load_texture("worn", img, repeat())
 }
 
 /// A texture repeated over `rect` at its natural size (in points).
@@ -834,10 +956,17 @@ pub fn panel_frame(area: Area, style: &egui::Style) -> egui::Frame {
         Area::Main => egui::Frame::central_panel(style),
         _ => egui::Frame::side_top_panel(style),
     };
-    if theme(current()).fx == Fx::Cyberdeck {
-        base.inner_margin(cyber_margin(area))
-    } else {
-        base
+    match theme(current()).fx {
+        Fx::Cyberdeck => base.inner_margin(cyber_margin(area)),
+        // Keep the menu clear of the grey trim.
+        // And the page clear of the grey bezel.
+        Fx::Worn if area == Area::Main => base.inner_margin((BEZEL + 8.0) as i8),
+        Fx::Worn if area == Area::Side => {
+            let mut m = base.inner_margin;
+            m.right = (TRIM + 6.0) as i8;
+            base.inner_margin(m)
+        }
+        _ => base,
     }
 }
 
@@ -878,6 +1007,7 @@ pub fn paint_panel(ui: &mut Ui, area: Area, tex: &mut Textures) {
             );
         }
         (Fx::Dither, Area::Main) => {}
+        (Fx::Worn, _) => paint_worn(ui, area, tex),
         (_, Area::Bar) => {
             vgrad(
                 painter,
@@ -958,6 +1088,135 @@ pub fn paint_panel(ui: &mut Ui, area: Area, tex: &mut Textures) {
                     *col,
                 );
             }
+        }
+    }
+}
+
+/// Light grey console case plastic, yellowed a little with age.
+pub(crate) const CASE_GREY: Color32 = c(0xaaa69c);
+/// Width of the grey case trim down the sidebar's right edge.
+pub(crate) const TRIM: f32 = 12.0;
+/// Width of the grey case around the main area.
+const BEZEL: f32 = 6.0;
+/// Height of the grey case section at the top of the sidebar, behind the logo.
+const CAP: f32 = 54.0;
+
+/// Text colour for the sidebar's heading, when the theme puts it on a light
+/// part of the case.
+pub fn side_heading_ink() -> Option<Color32> {
+    (theme(current()).fx == Fx::Worn).then_some(c(0x1c1c1f))
+}
+
+/// Light grey case plastic, worn and lit from above.
+fn case_grey(painter: &Painter, rect: Rect, worn: &TextureHandle) {
+    vgrad(
+        painter,
+        rect,
+        mix(CASE_GREY, Color32::WHITE, 0.1),
+        mix(CASE_GREY, Color32::BLACK, 0.12),
+    );
+    tile(painter, worn, rect, Color32::WHITE);
+}
+
+/// The NES theme's panels: worn black and grey console plastic.
+fn paint_worn(ui: &Ui, area: Area, tex: &mut Textures) {
+    let p = theme(current()).p;
+    // Fill the whole panel, margins included.
+    let rect = ui.clip_rect();
+    let painter = ui.painter();
+    let tx = tex.get(ui.ctx());
+    let worn = tx.worn.as_ref().unwrap();
+    match area {
+        Area::Bar => {
+            vgrad(
+                painter,
+                rect,
+                mix(p.bar, Color32::WHITE, 0.1),
+                mix(p.bar, Color32::BLACK, 0.12),
+            );
+            tile(painter, worn, rect, Color32::WHITE);
+            // The seam where the case halves meet.
+            painter.hline(
+                rect.x_range(),
+                rect.top() + 0.5,
+                Stroke::new(1.0, Color32::from_black_alpha(150)),
+            );
+            painter.hline(
+                rect.x_range(),
+                rect.top() + 1.5,
+                Stroke::new(1.0, Color32::from_white_alpha(70)),
+            );
+        }
+        Area::Side => {
+            vgrad(painter, rect, c(0x1d1d20), c(0x111113));
+            tile(painter, tx.ribs.as_ref().unwrap(), rect, Color32::WHITE);
+            tile(painter, worn, rect, Color32::WHITE);
+            let dark_gap = Stroke::new(2.0, Color32::from_black_alpha(200));
+            let lit = Stroke::new(1.0, Color32::from_white_alpha(90));
+            // Grey case trim down the right edge, with a dark gap before it.
+            let trim = Rect::from_min_max(Pos2::new(rect.right() - TRIM, rect.top()), rect.max);
+            case_grey(painter, trim, worn);
+            // Two shallow grooves moulded into the trim.
+            for f in [0.36, 0.64] {
+                let x = trim.left() + trim.width() * f;
+                painter.vline(
+                    x,
+                    rect.y_range(),
+                    Stroke::new(1.0, Color32::from_black_alpha(55)),
+                );
+                painter.vline(
+                    x + 1.0,
+                    rect.y_range(),
+                    Stroke::new(1.0, Color32::from_white_alpha(45)),
+                );
+            }
+            painter.vline(trim.left() + 1.5, rect.y_range(), lit);
+            painter.vline(trim.left() - 1.0, rect.y_range(), dark_gap);
+            painter.vline(
+                trim.right() - 0.5,
+                rect.y_range(),
+                Stroke::new(1.0, Color32::from_black_alpha(90)),
+            );
+            // The grey top of the case, behind the logo, stepping down onto
+            // the black strip.
+            let cap = Rect::from_min_max(rect.min, Pos2::new(rect.right(), rect.top() + CAP));
+            case_grey(painter, cap, worn);
+            painter.hline(cap.x_range(), cap.bottom() + 1.0, dark_gap);
+            painter.hline(
+                cap.x_range(),
+                cap.bottom() + 2.5,
+                Stroke::new(1.0, Color32::from_white_alpha(14)),
+            );
+            painter.hline(
+                cap.x_range(),
+                cap.bottom() - 1.5,
+                Stroke::new(1.0, Color32::from_black_alpha(60)),
+            );
+        }
+        Area::Main => {
+            // A dark inset framed by the grey case.
+            case_grey(painter, rect, worn);
+            let inset = rect.shrink(BEZEL);
+            vgrad(
+                painter,
+                inset,
+                mix(p.bg, Color32::WHITE, 0.03),
+                mix(p.bg, Color32::BLACK, 0.18),
+            );
+            tile(painter, worn, inset, Color32::WHITE);
+            // Bevel: shadowed top and left inside edge, lit bottom and right.
+            let shade = Stroke::new(2.0, Color32::from_black_alpha(170));
+            let lit = Stroke::new(1.0, Color32::from_white_alpha(70));
+            painter.hline(inset.x_range(), inset.top() + 1.0, shade);
+            painter.vline(inset.left() + 1.0, inset.y_range(), shade);
+            painter.hline(inset.x_range(), inset.bottom() + 0.5, lit);
+            painter.vline(inset.right() + 0.5, inset.y_range(), lit);
+            // Lit top edge and shadowed lower edge of the case itself.
+            painter.hline(
+                rect.x_range(),
+                rect.top() + 0.5,
+                Stroke::new(1.0, Color32::from_white_alpha(90)),
+            );
         }
     }
 }

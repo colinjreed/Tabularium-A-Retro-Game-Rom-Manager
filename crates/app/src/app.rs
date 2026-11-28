@@ -317,14 +317,19 @@ impl RomApp {
         ui.add_space(14.0);
         ui.horizontal(|ui| {
             ui.add_space(6.0);
+            let ink = themes::side_heading_ink();
             if themes::has_pixel_icons() {
                 let (r, _) = ui.allocate_exact_size(egui::vec2(24.0, 24.0), egui::Sense::hover());
-                let col = ui.visuals().strong_text_color();
+                let col = ink.unwrap_or_else(|| ui.visuals().strong_text_color());
                 themes::paint_icon(ui.painter(), r, Icon::Logo, col);
             } else {
                 ui.label(RichText::new("🎮").size(22.0));
             }
-            ui.label(themes::head("Tabularium", 19.0).strong());
+            let mut title = themes::head("Tabularium", 19.0).strong();
+            if let Some(ink) = ink {
+                title = title.color(ink);
+            }
+            ui.label(title);
         });
         ui.add_space(14.0);
         for p in Page::ALL {

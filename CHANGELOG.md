@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.7
+
+### Improved
+- **NES theme:** worn, gritty console plastic all the way through:
+  - scuffs, scratches, gouges and grime on every surface;
+  - a ribbed black sidebar with the case's light grey along its edge and
+    behind the logo;
+  - the console's front panel at the bottom of the sidebar, with the power
+    light, POWER and RESET buttons and both controller ports;
+  - the main area set into the grey case like an inset, and a grey status
+    bar.
+
 ## 0.2.6
 
 ### New
