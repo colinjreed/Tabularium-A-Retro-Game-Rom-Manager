@@ -629,7 +629,151 @@ pub fn paint_side_art(painter: &Painter, area: Rect) {
                 );
             }
         }
-        ThemeId::Nes | ThemeId::Famicom => {
+        ThemeId::Nes => {
+            // The console's front: a grey ledge, then the black panel with
+            // the power light, POWER and RESET buttons and the two
+            // controller ports.
+            let full = painter.clip_rect();
+            let u = (area.width() / 154.0)
+                .min(1.2)
+                .min((area.height() - 4.0) / 124.0);
+            let h = 124.0 * u;
+            let top = area.bottom() - h;
+            let grey = super::CASE_GREY;
+            let ledge = Rect::from_min_max(
+                Pos2::new(full.left(), top),
+                Pos2::new(full.right() - super::TRIM - 2.0, top + 14.0 * u),
+            );
+            vgrad(
+                painter,
+                ledge,
+                mix(grey, Color32::WHITE, 0.12),
+                mix(grey, Color32::BLACK, 0.2),
+            );
+            painter.hline(
+                ledge.x_range(),
+                ledge.top() + 0.5,
+                Stroke::new(1.0, Color32::from_white_alpha(110)),
+            );
+            painter.hline(
+                ledge.x_range(),
+                ledge.bottom() + 1.0,
+                Stroke::new(2.0, Color32::from_black_alpha(210)),
+            );
+            // The smooth black front panel, below the ribbed strip.
+            let front = Rect::from_min_max(
+                Pos2::new(ledge.left(), ledge.bottom() + 2.0),
+                Pos2::new(ledge.right(), area.bottom() + 6.0),
+            );
+            vgrad(painter, front, c(0x161618), c(0x0d0d0f));
+            let label = |at: Pos2, text: &str| {
+                painter.text(
+                    at,
+                    Align2::CENTER_CENTER,
+                    text,
+                    FontId::monospace(8.0 * u.max(0.9)),
+                    mix(grey, Color32::BLACK, 0.2),
+                );
+            };
+            let mid = area.center().x;
+            let cols = [mid - 34.0 * u, mid + 34.0 * u];
+            let row1 = front.top() + 32.0 * u;
+            let row2 = front.top() + 82.0 * u;
+            // POWER and RESET: grey buttons sunk into black wells.
+            for (cx, text) in cols.iter().zip(["POWER", "RESET"]) {
+                label(Pos2::new(*cx, row1 - 18.0 * u), text);
+                let btn = Rect::from_center_size(Pos2::new(*cx, row1), Vec2::new(46.0, 16.0) * u);
+                let well = btn.expand(3.0 * u);
+                painter.rect_filled(well, 2, c(0x050506));
+                painter.hline(
+                    well.x_range(),
+                    well.bottom() + 0.5,
+                    Stroke::new(1.0, Color32::from_white_alpha(26)),
+                );
+                vgrad(
+                    painter,
+                    btn,
+                    mix(grey, Color32::WHITE, 0.16),
+                    mix(grey, Color32::BLACK, 0.16),
+                );
+                painter.hline(
+                    btn.x_range(),
+                    btn.top() + 0.5,
+                    Stroke::new(1.0, Color32::from_white_alpha(120)),
+                );
+                painter.hline(
+                    btn.x_range(),
+                    btn.bottom() - 0.5,
+                    Stroke::new(1.0, Color32::from_black_alpha(110)),
+                );
+                // Grime worked into the edges from years of thumbs.
+                for r in [
+                    btn.with_max_x(btn.left() + 3.0 * u),
+                    btn.with_min_x(btn.right() - 3.0 * u),
+                ] {
+                    painter.rect_filled(r, 0, Color32::from_black_alpha(38));
+                }
+                painter.rect_filled(
+                    Rect::from_center_size(btn.center(), Vec2::new(18.0, 6.0) * u),
+                    3,
+                    Color32::from_white_alpha(16),
+                );
+            }
+            // Power light, lit, beside the POWER button.
+            let led = Pos2::new(cols[0] - 35.0 * u, row1);
+            painter.circle_filled(led, 8.0 * u, ca(0xff2010, 30));
+            painter.circle_filled(led, 4.5 * u, ca(0xff2010, 60));
+            painter.rect_filled(
+                Rect::from_center_size(led, Vec2::new(5.0, 4.0) * u),
+                1,
+                c(0xff3a22),
+            );
+            painter.rect_filled(
+                Rect::from_center_size(led - Vec2::new(0.8, 0.8) * u, Vec2::new(2.0, 1.2) * u),
+                0,
+                c(0xffc4ac),
+            );
+            // Controller ports 1 and 2: grey faces with a socket, square on
+            // one side and rounded on the other.
+            for (i, cx) in cols.iter().enumerate() {
+                label(Pos2::new(*cx, row2 - 22.0 * u), ["1", "2"][i]);
+                let face = Rect::from_center_size(Pos2::new(*cx, row2), Vec2::new(40.0, 26.0) * u);
+                painter.rect_filled(face.expand(2.0), 3, c(0x050506));
+                vgrad(
+                    painter,
+                    face,
+                    mix(grey, Color32::BLACK, 0.04),
+                    mix(grey, Color32::BLACK, 0.3),
+                );
+                painter.hline(
+                    face.x_range(),
+                    face.top() + 0.5,
+                    Stroke::new(1.0, Color32::from_white_alpha(90)),
+                );
+                let sock = Rect::from_center_size(face.center(), Vec2::new(24.0, 13.0) * u);
+                let round = (6.5 * u) as u8;
+                painter.rect_filled(
+                    sock,
+                    CornerRadius {
+                        nw: 1,
+                        sw: 1,
+                        ne: round,
+                        se: round,
+                    },
+                    c(0x0a0a0b),
+                );
+                for k in 0..4 {
+                    let px = sock.left() + (4.0 + k as f32 * 4.6) * u;
+                    let dot =
+                        |y: f32| painter.circle_filled(Pos2::new(px, y), 1.1 * u, c(0x9a8656));
+                    dot(sock.center().y - 2.6 * u);
+                    if k < 3 {
+                        dot(sock.center().y + 2.6 * u);
+                    }
+                }
+            }
+        }
+        ThemeId::Famicom => {
             let body = Rect::from_min_max(at(0.0, 0.5), at(1.0, 0.96));
             painter.rect_stroke(body, 4, st, egui::StrokeKind::Middle);
             painter.rect_stroke(body.shrink(6.0), 2, st, egui::StrokeKind::Middle);
