@@ -153,6 +153,18 @@ pub fn candidate_crcs(path: &Path, content_crc: &str) -> Vec<String> {
     let mut out = vec![content_crc.to_lowercase()];
     let ext = crate::detect::ext_of(path);
     let size = fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+    // NES dumps usually start with a 16-byte iNES header (plus a 512-byte
+    // trainer when flagged); lists may hold the CRC of the data without it.
+    if ext == "nes" {
+        if let Ok(data) = fs::read(path) {
+            if data.len() > 16 && data.starts_with(b"NES\x1a") {
+                let skip = 16 + if data[6] & 4 != 0 { 512 } else { 0 };
+                if data.len() > skip {
+                    out.push(format!("{:08x}", crc32fast::hash(&data[skip..])));
+                }
+            }
+        }
+    }
     if matches!(ext.as_str(), "smc" | "sfc" | "swc" | "fig") && size % 1024 == 512 {
         if let Ok(mut f) = File::open(path) {
             let mut h = crc32fast::Hasher::new();
@@ -175,9 +187,14 @@ pub fn candidate_crcs(path: &Path, content_crc: &str) -> Vec<String> {
 /// Names like "1942 (Japan)" or "007 Racing" are left alone unless numbered.
 pub fn strip_numbering(stem: &str) -> Option<String> {
     static RE: OnceLock<Regex> = OnceLock::new();
-    let re = RE
-        .get_or_init(|| Regex::new(r"^\s*\d{1,4}\s*(?:[-_.)\]]\s*|\s+)([A-Za-z'\[(].*)$").unwrap());
+    let re = RE.get_or_init(|| {
+        Regex::new(r"^\s*\d{1,4}\s*(?:[-_.)\]]\s*|\s+)([A-Za-z'\[(].*|007.*)$").unwrap()
+    });
     let c = re.captures(stem)?;
+    // "007 - The World Is Not Enough", "007 Racing": the Bond games.
+    if stem.trim_start().starts_with("007") {
+        return None;
+    }
     let rest = c[1].trim().to_string();
     // "1942 (Japan)" -> the number is the title itself.
     if rest.starts_with('(') || rest.starts_with('[') || naming::parse(&rest).title.is_empty() {
@@ -188,6 +205,16 @@ pub fn strip_numbering(stem: &str) -> Option<String> {
 
 /// Should numbering be stripped for this group of names? Only when most of
 /// them are numbered, so a lone "007 - The World Is Not Enough" is kept.
+/// Numbering that's never part of a title: four digits starting with zero,
+/// then a separator, like "0042 - " or "0137_". Shorter numbers such as
+/// "003 - " are only stripped when most of their folder is numbered.
+pub fn obviously_numbered(stem: &str) -> bool {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"^\s*0\d{3}\s*[-_.)\]]").unwrap())
+        .is_match(stem)
+        && strip_numbering(stem).is_some()
+}
+
 pub fn mostly_numbered<'a>(stems: impl Iterator<Item = &'a str>) -> bool {
     let (mut total, mut numbered) = (0, 0);
     for s in stems {
@@ -237,6 +264,17 @@ game (
             Some("Golden Axe")
         );
         assert_eq!(strip_numbering("1942 (Japan)"), None);
+        assert_eq!(strip_numbering("007 - The World Is Not Enough (USA)"), None);
+        assert_eq!(strip_numbering("007 Racing (USA)"), None);
+        assert_eq!(
+            strip_numbering("0123 - 007 - Nightfire (USA)").as_deref(),
+            Some("007 - Nightfire (USA)")
+        );
+        assert!(obviously_numbered("0042 - Golden Axe"));
+        assert!(obviously_numbered("0137_Contra (USA)"));
+        assert!(!obviously_numbered("007 - Nightfire (USA)"));
+        assert!(!obviously_numbered("003 - Sonic"));
+        assert!(!obviously_numbered("1942 (Japan)"));
         assert_eq!(strip_numbering("Sonic"), None);
         assert!(mostly_numbered(
             ["001 A", "002 B", "003 C", "D"].into_iter()

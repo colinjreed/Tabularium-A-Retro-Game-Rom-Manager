@@ -124,3 +124,77 @@ pub fn detect_scummvm_id(
     let name = crate::library::split_name(dir).0.to_ascii_lowercase();
     known_ids.filter(|ids| ids.contains(&name)).map(|_| name)
 }
+
+/// An installed ScummVM, if one can be found in the usual places.
+pub fn find_scummvm() -> Option<PathBuf> {
+    let mut candidates: Vec<PathBuf> = vec![];
+    if let Some(path) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&path) {
+            candidates.push(dir.join(if cfg!(windows) {
+                "scummvm.exe"
+            } else {
+                "scummvm"
+            }));
+        }
+    }
+    if cfg!(target_os = "macos") {
+        candidates.push("/Applications/ScummVM.app/Contents/MacOS/scummvm".into());
+        if let Some(home) = std::env::var_os("HOME") {
+            candidates
+                .push(Path::new(&home).join("Applications/ScummVM.app/Contents/MacOS/scummvm"));
+        }
+    }
+    if cfg!(windows) {
+        for var in ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"] {
+            if let Some(base) = std::env::var_os(var) {
+                candidates.push(Path::new(&base).join("ScummVM").join("scummvm.exe"));
+                candidates.push(Path::new(&base).join("Programs\\ScummVM\\scummvm.exe"));
+            }
+        }
+    }
+    if cfg!(target_os = "linux") {
+        candidates.push("/usr/games/scummvm".into());
+    }
+    candidates.into_iter().find(|p| p.is_file())
+}
+
+/// Ask ScummVM which game is in `dir` (`scummvm --detect`), as its "Add game"
+/// does: it recognises every supported game by its files.
+pub fn scummvm_detect(exe: &Path, dir: &Path) -> Option<String> {
+    let out = std::process::Command::new(exe)
+        .arg("--detect")
+        .arg(format!("--path={}", dir.display()))
+        .stdin(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    parse_detect_output(&String::from_utf8_lossy(&out.stdout))
+}
+
+/// The first game ID in `scummvm --detect` output: the table row after the
+/// dashed line. Newer versions print "engine:id"; firmware wants the id.
+pub fn parse_detect_output(text: &str) -> Option<String> {
+    let mut rows = text
+        .lines()
+        .skip_while(|l| !l.trim_start().starts_with("---"));
+    rows.next()?;
+    let first = rows.find(|l| !l.trim().is_empty())?;
+    let id = first.split_whitespace().next()?;
+    let id = id.rsplit(':').next().unwrap_or(id);
+    (!id.is_empty()).then(|| id.to_string())
+}
+
+#[cfg(test)]
+mod detect_tests {
+    use super::parse_detect_output;
+
+    #[test]
+    fn reads_scummvm_detect_output() {
+        let new = "GameID                         Description                       Full Path\n\
+                   ------------------------------ --------------------------------- ---------\n\
+                   scumm:monkey                   The Secret of Monkey Island (CD)  /g/mi1\n";
+        assert_eq!(parse_detect_output(new).as_deref(), Some("monkey"));
+        let old = "GameID       Description\n------------ -----------\nsky          Beneath a Steel Sky\n";
+        assert_eq!(parse_detect_output(old).as_deref(), Some("sky"));
+        assert_eq!(parse_detect_output("WARNING: no games found\n"), None);
+    }
+}

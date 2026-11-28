@@ -586,3 +586,28 @@ fn older_disc_games_are_rechecked_by_their_tracks() -> Result<()> {
     assert_eq!(dupes.len(), 1, "the copy is found once rechecked");
     Ok(())
 }
+
+#[test]
+fn folders_of_dos_games_are_searched_not_imported_whole() {
+    let tmp = tempfile::tempdir().unwrap();
+    let dos = tmp.path().join("src/DOS");
+    // A group of games: no files of its own, several game folders inside.
+    write(&dos.join("Sierra/Kings Quest/KQ1.EXE"), &rand(2000, "kq1"));
+    write(&dos.join("Sierra/Space Quest/SQ1.EXE"), &rand(2000, "sq1"));
+    // A game installed in a single subfolder stays one game.
+    write(&dos.join("Doom/DOOM/DOOM.EXE"), &rand(2000, "doom"));
+    // An ordinary game folder.
+    write(&dos.join("Commander Keen/KEEN1.EXE"), &rand(2000, "keen"));
+    let found = tabularium_core::detect::scan(&[tmp.path().join("src")], None, &|| false);
+    let mut names: Vec<String> = found
+        .sets
+        .iter()
+        .filter(|s| s.system.map(|s| s.id) == Some("dos"))
+        .map(|s| s.main.file_name().unwrap().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        ["Commander Keen", "Doom", "Kings Quest", "Space Quest"]
+    );
+}

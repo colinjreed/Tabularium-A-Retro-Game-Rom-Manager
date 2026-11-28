@@ -60,6 +60,8 @@ pub struct LibData {
     pub tags: Vec<(String, u64)>,
     /// Older disc games whose checksum still comes from the sheet file.
     pub discs_to_recheck: usize,
+    /// ScummVM game folders without a game ID.
+    pub scummvm_missing: usize,
     pub genres: Vec<(String, u64)>,
     /// SD card (collection) names, for "Add to card".
     pub cards: Vec<String>,
@@ -181,6 +183,7 @@ impl RomApp {
                 with_art: lib.roms_with_media("boxart")?,
                 tags: lib.all_tags()?,
                 discs_to_recheck: lib.disc_games_to_recheck()?.len(),
+                scummvm_missing: tabularium_core::metadata::scummvm_missing_ids(lib)?.len(),
                 genres: lib.all_genres()?,
                 cards: tabularium_core::collection::list(lib),
                 version: 0,
@@ -260,6 +263,16 @@ impl RomApp {
                 };
                 if let Some(n) = h.notes.first() {
                     msg += &format!(" {n}");
+                }
+                self.notify(msg);
+            }
+            Some(JobOutput::ScummvmIds(found, missing)) => {
+                self.reload();
+                let mut msg = format!("Found {found} ScummVM game ID(s).");
+                if missing > 0 {
+                    msg += &format!(
+                        " {missing} still unknown: select them in the Library to set the ID by hand."
+                    );
                 }
                 self.notify(msg);
             }

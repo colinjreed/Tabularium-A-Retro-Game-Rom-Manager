@@ -160,14 +160,24 @@ pub fn fix_library(
         }
     }
     if strip_numbers {
-        for (system, list) in &unmatched {
-            // Judge by the whole system: matched ROMs count as evidence too.
-            let all = roms
-                .iter()
-                .filter(|r| &r.system == system)
-                .map(|r| r.stem.as_str());
-            if dats::mostly_numbered(all) {
-                for r in list {
+        // Judge each game by the folder it was imported from (its siblings
+        // there, matched or not); games with no recorded source by system.
+        let group = |r: &Rom| -> String {
+            r.source_path()
+                .and_then(|s| Path::new(s).parent())
+                .map(|p| format!("{}\u{0}{}", r.system, p.display()))
+                .unwrap_or_else(|| r.system.clone())
+        };
+        let mut groups: BTreeMap<String, Vec<&Rom>> = BTreeMap::new();
+        for r in &roms {
+            groups.entry(group(r)).or_default().push(r);
+        }
+        for list in unmatched.values() {
+            for r in list {
+                let siblings = &groups[&group(r)];
+                let numbered = dats::obviously_numbered(&r.stem)
+                    || dats::mostly_numbered(siblings.iter().map(|s| s.stem.as_str()));
+                if numbered {
                     if let Some(s) = dats::strip_numbering(&r.stem) {
                         report.changes.push(NameChange {
                             rom: (*r).clone(),

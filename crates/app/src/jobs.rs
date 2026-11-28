@@ -27,6 +27,8 @@ pub enum JobOutput {
     Genres(usize),
     /// Disc games re-checksummed by their tracks.
     DiscsRechecked(usize),
+    /// ScummVM IDs found, and games still without one.
+    ScummvmIds(usize, usize),
     Rename {
         report: tabularium_core::rename::FixReport,
         applied: bool,

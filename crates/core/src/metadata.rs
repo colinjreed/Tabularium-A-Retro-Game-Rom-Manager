@@ -162,36 +162,7 @@ pub fn enrich(lib: &Library, fetch: &Fetcher, rep: &dyn Reporter) -> Result<()> 
         }
     }
     if !scumm.is_empty() {
-        rep.progress(0, 0, "Fetching ScummVM game list…");
-        match scummvm_ids(&cache, fetch) {
-            Some(ids) => {
-                let valid: std::collections::HashSet<String> = ids.values().cloned().collect();
-                for r in &scumm {
-                    let dir = lib.abspath(&r.path);
-                    let id = folder_games::detect_scummvm_id(&dir, Some(&valid))
-                        .or_else(|| guess_scummvm_id(&ids, &r.stem));
-                    match id {
-                        Some(id) => {
-                            folder_games::write_scummvm_id(&dir, &r.stem, &id)?;
-                            rep.log(format!("ScummVM: {} -> {id}", r.stem));
-                        }
-                        None => rep.log(format!(
-                            "ScummVM: couldn't identify '{}'. Add a '{}.scummvm' file containing its game ID.",
-                            r.stem, r.stem
-                        )),
-                    }
-                }
-            }
-            None => {
-                for r in &scumm {
-                    let dir = lib.abspath(&r.path);
-                    if let Some(id) = folder_games::detect_scummvm_id(&dir, None) {
-                        folder_games::write_scummvm_id(&dir, &r.stem, &id)?;
-                    }
-                }
-                rep.log("Couldn't download the ScummVM game list; only well-known games were identified.".into());
-            }
-        }
+        identify_scummvm(lib, Some(fetch), rep)?;
     }
     enrich_genres(lib, fetch, rep)?;
     Ok(())
@@ -246,6 +217,79 @@ fn genre_map(cache: &Path, system: &str, fetch: &Fetcher) -> Option<HashMap<Stri
 }
 
 /// Fill in genres for ROMs that don't have one yet. Returns how many were found.
+/// ScummVM game folders in the library that have no game ID yet.
+pub fn scummvm_missing_ids(lib: &Library) -> Result<Vec<crate::library::Rom>> {
+    Ok(lib
+        .active()?
+        .into_iter()
+        .filter(|r| r.system == "scummvm")
+        .filter(|r| {
+            let p = lib.abspath(&r.path);
+            p.is_dir() && folder_games::scummvm_id(&p).is_none()
+        })
+        .collect())
+}
+
+/// Give every ScummVM game folder without one a game ID, writing the
+/// `<Game>.scummvm` file firmware launches. Tries well-known files, then an
+/// installed ScummVM (which knows every supported game by its files), then
+/// libretro's ScummVM list by title. Returns (identified, still missing).
+pub fn identify_scummvm(
+    lib: &Library,
+    fetch: Option<&Fetcher>,
+    rep: &dyn Reporter,
+) -> Result<(usize, usize)> {
+    let todo = scummvm_missing_ids(lib)?;
+    if todo.is_empty() {
+        return Ok((0, 0));
+    }
+    let exe = folder_games::find_scummvm();
+    match &exe {
+        Some(p) => rep.log(format!(
+            "Asking ScummVM ({}) to identify games.",
+            p.display()
+        )),
+        None => rep.log(
+            "ScummVM isn't installed (or wasn't found), so games are matched by name only. \
+             Install ScummVM and run this again to identify more."
+                .into(),
+        ),
+    }
+    rep.progress(0, 0, "Fetching ScummVM game list…");
+    let ids = fetch.and_then(|f| scummvm_ids(&cache_dir(lib), f));
+    let valid: Option<std::collections::HashSet<String>> =
+        ids.as_ref().map(|m| m.values().cloned().collect());
+    let (mut found, mut missing) = (0, 0);
+    for (i, r) in todo.iter().enumerate() {
+        if rep.cancelled() {
+            break;
+        }
+        rep.progress(i, todo.len(), &format!("Identifying {}", r.stem));
+        let dir = lib.abspath(&r.path);
+        let id = folder_games::detect_scummvm_id(&dir, valid.as_ref())
+            .or_else(|| {
+                exe.as_deref()
+                    .and_then(|e| folder_games::scummvm_detect(e, &dir))
+            })
+            .or_else(|| ids.as_ref().and_then(|m| guess_scummvm_id(m, &r.stem)));
+        match id {
+            Some(id) => {
+                folder_games::write_scummvm_id(&dir, &r.stem, &id)?;
+                rep.log(format!("ScummVM: {} -> {id}", r.stem));
+                found += 1;
+            }
+            None => {
+                rep.log(format!(
+                    "ScummVM: couldn't identify '{}'. Set its game ID in the Library.",
+                    r.stem
+                ));
+                missing += 1;
+            }
+        }
+    }
+    Ok((found, missing))
+}
+
 pub fn enrich_genres(lib: &Library, fetch: &Fetcher, rep: &dyn Reporter) -> Result<usize> {
     let roms: Vec<_> = lib
         .active()?

@@ -34,6 +34,25 @@ impl RomApp {
                     "Find duplicates and versions you don't want. Nothing is deleted: removed ROMs go to the \
                      trash, where you can restore them.",
                 );
+                let missing = self.data.scummvm_missing;
+                if missing > 0 {
+                    card(ui, |ui| {
+                        section(ui, "ScummVM game IDs");
+                        ui.label(format!(
+                            "{missing} ScummVM game(s) have no game ID, so handheld firmware won't know \
+                             how to start them. If ScummVM is installed on this computer, Tabularium asks \
+                             it to recognise each game from its files, the same way ScummVM's 'Add Game' \
+                             does; otherwise it matches by name."
+                        ));
+                        if ui
+                            .add_enabled(!self.busy(), egui::Button::new(RichText::new("Find ScummVM IDs").strong()))
+                            .clicked()
+                        {
+                            self.start_scummvm_ids(ui.ctx());
+                        }
+                    });
+                    ui.add_space(10.0);
+                }
                 let n = self.data.discs_to_recheck;
                 if n > 0 {
                     card(ui, |ui| {
@@ -225,6 +244,21 @@ impl RomApp {
         if results.len() > 3000 {
             ui.label(format!("…and {} more", results.len() - 3000));
         }
+    }
+
+    fn start_scummvm_ids(&mut self, ctx: &egui::Context) {
+        let Some(root) = self.library_root() else {
+            return;
+        };
+        self.job = Some(Job::spawn("Finding ScummVM game IDs", ctx, move |rep| {
+            let fetch = tabularium_core::http::default_fetcher();
+            match Library::open(&root).and_then(|lib| {
+                tabularium_core::metadata::identify_scummvm(&lib, Some(&fetch), rep)
+            }) {
+                Ok((found, missing)) => JobOutput::ScummvmIds(found, missing),
+                Err(e) => JobOutput::Error(e.to_string()),
+            }
+        }));
     }
 
     fn start_disc_recheck(&mut self, ctx: &egui::Context) {
