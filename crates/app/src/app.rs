@@ -73,6 +73,7 @@ pub struct RomApp {
     /// The app's normal dark and light styles (the Standard theme).
     pub base_styles: (egui::Style, egui::Style),
     pub theme_tex: crate::themes::Textures,
+    autoscroll: crate::autoscroll::Autoscroll,
     /// The theme's start-up screen, while it's showing.
     pub boot: Option<themes::Boot>,
     pub settings: Settings,
@@ -117,6 +118,7 @@ impl RomApp {
         let mut app = RomApp {
             base_styles,
             theme_tex: Default::default(),
+            autoscroll: Default::default(),
             boot: None,
             settings,
             lib: None,
@@ -706,12 +708,17 @@ impl eframe::App for RomApp {
                 themes::BootStep::Finished => self.boot = None,
             }
         }
+        self.autoscroll.paint(ui.ctx());
         crate::themes::paint_overlay(
             ui.ctx(),
             &mut self.theme_tex,
             self.settings.crt_effect,
             self.settings.lcd_effect,
         );
+    }
+
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+        self.autoscroll.process(ctx, raw_input);
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
