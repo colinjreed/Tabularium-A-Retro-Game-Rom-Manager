@@ -687,7 +687,8 @@ impl Textures {
             }));
             // Fine grain like matte, slightly frosted plastic.
             self.frost = Some(pattern(ctx, "frost", 128, 128, |x, y| {
-                let mut h = (x as u32).wrapping_mul(0x9E37_79B1) ^ (y as u32).wrapping_mul(0x85EB_CA77);
+                let mut h =
+                    (x as u32).wrapping_mul(0x9E37_79B1) ^ (y as u32).wrapping_mul(0x85EB_CA77);
                 h ^= h >> 15;
                 h = h.wrapping_mul(0x2C1B_3C6D);
                 h ^= h >> 12;
