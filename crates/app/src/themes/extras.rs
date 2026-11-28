@@ -398,7 +398,45 @@ pub fn paint_side_art(painter: &Painter, area: Rect) {
         painter.rect_filled(Rect::from_center_size(c, Vec2::new(th, arm * 2.6)), 1, col);
     };
     match t.id {
-        ThemeId::GameBoy | ThemeId::AtomicPurple => {
+        ThemeId::AtomicPurple => {
+            // A speaker grille moulded into the case: staggered holes in a
+            // round patch, each dark inside with a lit lower lip.
+            let ctr = b.center();
+            let radius = s * 0.46;
+            let pitch = (s / 11.0).max(7.0);
+            let hole = pitch * 0.3;
+            let rows = (radius / (pitch * 0.866)).ceil() as i32;
+            for row in -rows..=rows {
+                let y = row as f32 * pitch * 0.866;
+                let shift = if row % 2 == 0 { 0.0 } else { pitch * 0.5 };
+                let cols = (radius / pitch).ceil() as i32 + 1;
+                for col in -cols..=cols {
+                    let p = ctr + Vec2::new(col as f32 * pitch + shift, y);
+                    if (p - ctr).length() > radius - hole {
+                        continue;
+                    }
+                    painter.circle_filled(p, hole + 1.2, Color32::from_white_alpha(18));
+                    painter.circle_filled(p, hole, Color32::from_black_alpha(120));
+                    painter.circle_filled(
+                        p - Vec2::new(0.0, hole * 0.25),
+                        hole * 0.7,
+                        Color32::from_black_alpha(70),
+                    );
+                }
+            }
+            // The moulded rim around the grille.
+            painter.circle_stroke(
+                ctr,
+                radius + 3.0,
+                Stroke::new(1.5, Color32::from_black_alpha(60)),
+            );
+            painter.circle_stroke(
+                ctr,
+                radius + 4.5,
+                Stroke::new(1.0, Color32::from_white_alpha(30)),
+            );
+        }
+        ThemeId::GameBoy => {
             let w = s * 0.66;
             let body = Rect::from_center_size(b.center(), Vec2::new(w, s));
             let x = |f: f32| body.left() + f * w;
