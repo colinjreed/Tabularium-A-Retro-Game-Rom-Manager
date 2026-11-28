@@ -437,13 +437,21 @@ pub fn folder_game_system(dir: &Path) -> Option<&'static System> {
             return systems::get(system);
         }
     }
-    // Directly inside a DOS / ScummVM folder: a game, whatever it's called
-    // ("DOS/Doom" is the game Doom, not the Doom-engine system).
+    // Inside a DOS / ScummVM folder: a game, whatever it's called ("DOS/Doom"
+    // is the game Doom, not the Doom-engine system), unless it's a folder of
+    // games ("DOS/Sierra/..."), which is searched instead. A grouping folder's
+    // contents still belong to that system, so look a few levels up.
     let parent_system = dir
-        .parent()
-        .and_then(|p| p.file_name())
-        .and_then(|n| systems::from_folder_name(&n.to_string_lossy()))
+        .ancestors()
+        .skip(1)
+        .take(4)
+        .filter_map(|p| p.file_name())
+        // The nearest system-named folder decides ("PC/roms/nes/Hacks" is NES).
+        .find_map(|n| systems::from_folder_name(&n.to_string_lossy()))
         .filter(|s| systems::folder_games(s.id));
+    if parent_system.is_some() && is_grouping_folder(dir) {
+        return None;
+    }
     if let Some(s) = parent_system {
         if systems::from_folder_name(&name)
             .is_none_or(|own| !systems::folder_games(own.id) || own.id == s.id)
@@ -473,8 +481,49 @@ pub fn folder_game_system(dir: &Path) -> Option<&'static System> {
     if has_pointer || sibling {
         return systems::get("scummvm");
     }
-    let parent = dir.parent()?.file_name()?.to_string_lossy().to_string();
-    systems::from_folder_name(&parent).filter(|s| systems::folder_games(s.id))
+    None
+}
+
+/// A folder that only holds other folders (at least two) and no files of its
+/// own, like "DOS/Sierra" or "ScummVM/LucasArts": a group of games, not one.
+fn is_grouping_folder(dir: &Path) -> bool {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return false;
+    };
+    let mut subdirs = 0;
+    for e in entries.flatten() {
+        let name = e.file_name().to_string_lossy().to_ascii_lowercase();
+        if name.starts_with('.') {
+            continue;
+        }
+        let Ok(t) = e.file_type() else { continue };
+        if t.is_dir() {
+            // A PS3 game folder holds a PS3_GAME folder and maybe nothing else.
+            if name == "ps3_game" || name == "usrdir" {
+                return false;
+            }
+            subdirs += 1;
+        } else if !matches!(
+            ext_of(&e.path()).as_str(),
+            "txt"
+                | "nfo"
+                | "md"
+                | "jpg"
+                | "jpeg"
+                | "png"
+                | "gif"
+                | "ini"
+                | "db"
+                | "url"
+                | "pdf"
+                | "htm"
+                | "html"
+                | "xml"
+        ) {
+            return false;
+        }
+    }
+    subdirs >= 2
 }
 
 #[derive(Debug, Default)]
