@@ -405,6 +405,148 @@ pub fn paint_side_art(painter: &Painter, area: Rect) {
             let radius = s * 0.46;
             let pitch = (s / 11.0).max(7.0);
             let hole = pitch * 0.3;
+            // The speaker on the board, seen through the plastic: metal frame,
+            // ribbed cone, centre cap, and its wires to the board.
+            let tint = |c: u32, a: u8| ca(c, a);
+            // Copper traces, pads, an amplifier chip and its capacitors,
+            // drawn first so the speaker sits on top of the board.
+            let copper = tint(0x2f8a63, 230);
+            let trace = |pts: Vec<Pos2>, w: f32| {
+                painter.add(Shape::line(pts, Stroke::new(w, copper)));
+            };
+            let at = |x: f32, y: f32| ctr + Vec2::new(radius * x, radius * y);
+            let pad_p = at(1.02, -0.98);
+            let pad_n = at(0.78, -1.18);
+            let amp = Rect::from_center_size(at(0.05, -1.62), Vec2::splat(radius * 0.32));
+            // Pads to the amplifier, with 45-degree bends.
+            trace(
+                vec![
+                    pad_p,
+                    at(1.02, -1.3),
+                    at(0.72, -1.6),
+                    amp.right_center() + Vec2::new(0.0, 3.0),
+                ],
+                2.2,
+            );
+            trace(
+                vec![
+                    pad_n,
+                    at(0.6, -1.36),
+                    amp.right_center() - Vec2::new(0.0, 3.0),
+                ],
+                2.2,
+            );
+            // Supply and signal traces leaving the amplifier for the rest of the board.
+            for (i, y) in [-0.1f32, 0.0, 0.1].iter().enumerate() {
+                let p0 = amp.left_center() + Vec2::new(0.0, radius * y);
+                let p1 = p0 - Vec2::new(radius * (0.25 + i as f32 * 0.08), 0.0);
+                trace(
+                    vec![p0, p1, p1 - Vec2::new(radius * 0.3, radius * 0.3)],
+                    1.4,
+                );
+            }
+            trace(
+                vec![
+                    amp.center_top(),
+                    amp.center_top() - Vec2::new(0.0, radius * 0.35),
+                ],
+                1.4,
+            );
+            // Vias where traces dive through the board.
+            for p in [
+                at(-0.62, -1.92),
+                at(-0.7, -1.9),
+                at(-0.8, -1.88),
+                at(0.05, -2.14),
+            ] {
+                painter.circle_filled(p, 2.2, c(0xc8a454));
+                painter.circle_filled(p, 0.9, tint(0x143a2c, 255));
+            }
+            // The amplifier chip with its pins.
+            for k in 0..4 {
+                let f = -0.75 + k as f32 * 0.5;
+                for (a, b) in [(amp.left(), -1.0), (amp.right(), 1.0)] {
+                    let y = amp.center().y + f * amp.height() * 0.4;
+                    painter.rect_filled(
+                        Rect::from_min_size(
+                            Pos2::new(a.min(a + b * 3.0), y - 1.0),
+                            Vec2::new(3.0, 2.0),
+                        ),
+                        0,
+                        tint(0xc4c6cc, 230),
+                    );
+                }
+            }
+            painter.rect_filled(amp, 1, tint(0x1c1c22, 240));
+            painter.circle_filled(amp.min + Vec2::splat(3.0), 1.2, tint(0x50505a, 255));
+            // Decoupling capacitors next to it.
+            for (x, y) in [(-0.38, -1.42), (-0.38, -1.62), (0.45, -1.86)] {
+                let r = Rect::from_center_size(at(x, y), Vec2::new(7.0, 3.5));
+                painter.rect_filled(r, 0, tint(0x8a6e50, 235));
+                painter.rect_filled(r.with_max_x(r.left() + 1.5), 0, tint(0xc8c8c4, 235));
+                painter.rect_filled(r.with_min_x(r.right() - 1.5), 0, tint(0xc8c8c4, 235));
+            }
+            // Speaker pads and silkscreen.
+            for p in [pad_p, pad_n] {
+                painter.circle_filled(p, 4.0, c(0xc8a454));
+                painter.circle_filled(p, 1.6, tint(0x8a6a30, 255));
+            }
+            let silk = Color32::from_white_alpha(150);
+            let font = FontId::monospace(7.0);
+            painter.text(
+                pad_p + Vec2::new(6.0, 0.0),
+                Align2::LEFT_CENTER,
+                "SPK+",
+                font.clone(),
+                silk,
+            );
+            painter.text(
+                pad_n + Vec2::new(-6.0, -6.0),
+                Align2::RIGHT_CENTER,
+                "SPK-",
+                font.clone(),
+                silk,
+            );
+            painter.text(
+                amp.center_bottom() + Vec2::new(0.0, 3.0),
+                Align2::CENTER_TOP,
+                "U12",
+                font,
+                silk,
+            );
+            // Speaker wires from its tabs to the pads.
+            let wire = |from: Pos2, to: Pos2, col: u32| {
+                let mid = from.lerp(to, 0.5) + Vec2::new(4.0, 2.0);
+                painter.add(Shape::line(
+                    vec![from, mid, to],
+                    Stroke::new(2.2, tint(col, 210)),
+                ));
+            };
+            let tab_p = at(0.66, -0.56);
+            let tab_n = at(0.5, -0.7);
+            painter.circle_filled(ctr, radius + 6.0, tint(0x2a2a31, 215));
+            painter.circle_stroke(ctr, radius + 6.0, Stroke::new(1.5, tint(0xa8a8b4, 170)));
+            painter.circle_stroke(ctr, radius + 1.5, Stroke::new(1.0, tint(0x6a6a74, 150)));
+            painter.circle_filled(ctr, radius * 0.9, tint(0x141418, 225));
+            for k in 1..6 {
+                let r = radius * (0.32 + k as f32 * 0.11);
+                painter.circle_stroke(ctr, r, Stroke::new(1.0, Color32::from_white_alpha(14)));
+            }
+            painter.circle_filled(ctr, radius * 0.3, tint(0x2e2e36, 235));
+            painter.circle_stroke(
+                ctr - Vec2::new(radius * 0.06, radius * 0.06),
+                radius * 0.2,
+                Stroke::new(1.5, Color32::from_white_alpha(28)),
+            );
+            for tab in [tab_p, tab_n] {
+                painter.rect_filled(
+                    Rect::from_center_size(tab, Vec2::splat(5.0)),
+                    1,
+                    c(0xc8a454),
+                );
+            }
+            wire(tab_p, pad_p, 0xc8322e);
+            wire(tab_n, pad_n, 0x1a1a1e);
             let rows = (radius / (pitch * 0.866)).ceil() as i32;
             for row in -rows..=rows {
                 let y = row as f32 * pitch * 0.866;
