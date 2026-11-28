@@ -33,6 +33,8 @@ pub struct ImportReport {
     pub errors: Vec<(PathBuf, String)>,
     pub unknown: Vec<RomSet>,
     pub ignored: usize,
+    /// Duplicates moved into the library's trash (when moving, not copying).
+    pub duplicates_trashed: usize,
     /// Files macOS had to download from iCloud first.
     pub from_cloud: usize,
     pub cancelled: bool,
@@ -100,7 +102,18 @@ pub fn import(
         };
         match lib.add(&rs, opts.move_files, opts.dry_run) {
             Ok(AddOutcome::Added(_)) => *out.added.entry(sys.id.to_string()).or_default() += 1,
-            Ok(AddOutcome::Duplicate(of)) => out.duplicates.push((rs.main, of)),
+            Ok(AddOutcome::Duplicate(of)) => {
+                // Moving should empty the source: put copies the library
+                // already has in its trash, where they can be restored.
+                if opts.move_files && !opts.dry_run {
+                    match lib.add_duplicate_to_trash(&rs, &of) {
+                        Ok(true) => out.duplicates_trashed += 1,
+                        Ok(false) => {}
+                        Err(e) => out.errors.push((rs.main.clone(), e.to_string())),
+                    }
+                }
+                out.duplicates.push((rs.main, of))
+            }
             Ok(AddOutcome::Conflict(why)) => {
                 rep.log(format!("Conflict: {name}: {why}"));
                 out.conflicts.push((rs.main, why))

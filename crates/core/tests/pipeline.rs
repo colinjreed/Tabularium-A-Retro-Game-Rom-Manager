@@ -611,3 +611,55 @@ fn folders_of_dos_games_are_searched_not_imported_whole() {
         ["Commander Keen", "Doom", "Kings Quest", "Space Quest"]
     );
 }
+
+#[test]
+fn moving_duplicates_puts_them_in_the_trash_not_left_behind() -> Result<()> {
+    let tmp = tempfile::tempdir().unwrap();
+    let make = |name: &str| {
+        let dir = tmp.path().join(name).join("NES");
+        for i in 0..5 {
+            write(
+                &dir.join(format!("Game {i}.nes")),
+                &rand(4096, &format!("nes{i}")),
+            );
+        }
+        tmp.path().join(name)
+    };
+    let lib = Library::create(&tmp.path().join("lib"))?;
+    let moving = ImportOptions {
+        move_files: true,
+        ..Default::default()
+    };
+    let first = make("first");
+    let rep = import(&lib, std::slice::from_ref(&first), &moving, &Silent)?;
+    assert_eq!(rep.added_total(), 5);
+    let second = make("second");
+    let rep = import(&lib, std::slice::from_ref(&second), &moving, &Silent)?;
+    assert_eq!(
+        (
+            rep.added_total(),
+            rep.duplicates.len(),
+            rep.duplicates_trashed
+        ),
+        (0, 5, 5)
+    );
+    let left = walkdir::WalkDir::new(&second)
+        .into_iter()
+        .flatten()
+        .filter(|e| e.file_type().is_file())
+        .count();
+    assert_eq!(left, 0, "the source folder is emptied");
+    assert_eq!(lib.active()?.len(), 5);
+    assert_eq!(lib.roms(&[], "trashed")?.len(), 5);
+    // Copying leaves the source alone.
+    let third = make("third");
+    let rep = import(
+        &lib,
+        std::slice::from_ref(&third),
+        &ImportOptions::default(),
+        &Silent,
+    )?;
+    assert_eq!((rep.duplicates.len(), rep.duplicates_trashed), (5, 0));
+    assert!(third.join("NES/Game 0.nes").exists());
+    Ok(())
+}
